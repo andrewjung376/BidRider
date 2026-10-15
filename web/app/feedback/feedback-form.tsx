@@ -2,21 +2,16 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useAuth } from "@/components/auth-provider";
+import { apiFetch, ClientApiError } from "@/lib/client-api";
 
 const MAX_MESSAGE = 2000; // api FeedbackIn.message 최대 길이
 const RATING_LABELS = ["매우 불만족", "불만족", "보통", "만족", "매우 만족"];
 
 type State = { kind: "idle" } | { kind: "sending" } | { kind: "done"; id: number } | { kind: "error"; message: string };
 
-// FastAPI 오류 응답({"detail": "..."} 또는 422의 [{loc, msg}])을 사람이 읽을 문장으로 바꾼다
-function errorMessage(status: number, body: unknown): string {
-  if (status === 422) return "입력값을 확인해 주세요. 만족도를 고르고 의견을 2000자 이내로 적어 주세요.";
-  const detail = (body as { detail?: unknown } | null)?.detail;
-  if (typeof detail === "string") return detail;
-  return `제출하지 못했습니다. 잠시 후 다시 시도해 주세요. (${status})`;
-}
-
 export default function FeedbackForm({ page }: { page: string | null }) {
+  const { session } = useAuth();
   const [rating, setRating] = useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [state, setState] = useState<State>({ kind: "idle" });
@@ -29,20 +24,21 @@ export default function FeedbackForm({ page }: { page: string | null }) {
     if (!canSubmit) return;
     setState({ kind: "sending" });
     try {
-      // 로그인 연동(#7) 전이라 Authorization 헤더 없이 보낸다 (api는 비로그인 제출 허용)
-      const res = await fetch("/api/feedback", {
+      // 비로그인 제출 허용. 로그인 상태면 토큰을 붙여 사용자와 연결해 저장한다
+      const { data } = await apiFetch<{ id: number }>("/api/feedback", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rating, message: trimmed, page }),
+        token: session?.access_token,
       });
-      const body = await res.json().catch(() => null);
-      if (res.status === 201) {
-        setState({ kind: "done", id: body?.id });
-      } else {
-        setState({ kind: "error", message: errorMessage(res.status, body) });
-      }
-    } catch {
-      setState({ kind: "error", message: "서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요." });
+      setState({ kind: "done", id: data.id });
+    } catch (error) {
+      const message =
+        error instanceof ClientApiError && error.status === 422
+          ? "입력값을 확인해 주세요. 만족도를 고르고 의견을 2000자 이내로 적어 주세요."
+          : error instanceof ClientApiError
+            ? error.message
+            : "제출하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+      setState({ kind: "error", message });
     }
   }
 
