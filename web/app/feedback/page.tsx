@@ -4,12 +4,25 @@ import FeedbackForm from "./feedback-form";
 export const metadata: Metadata = { title: "의견 보내기" };
 
 const MAX_PAGE_LENGTH = 200; // api FeedbackIn.page 최대 길이
+const SAME_ORIGIN = "http://local";
+// 역슬래시는 브라우저가 "/"로 바꿔 읽고(/\evil.com → //evil.com), 탭·줄바꿈은 URL 해석 때 지워진다
+const UNSAFE_CHARS = /[\\\u0000-\u001f\u007f]/;
 
-/** ?from= 값이 이 서비스 안의 경로일 때만 쓴다 */
+/**
+ * ?from= 값이 이 서비스 안의 경로일 때만 쓴다 (오픈 리다이렉트 방지).
+ * 이 값은 화면 표시, 피드백의 page 저장, "보던 화면으로 돌아가기" 링크에 그대로 쓰인다.
+ */
 function parseFrom(value: string | string[] | undefined): string | null {
   const text = Array.isArray(value) ? value[0] : value;
-  if (!text || !text.startsWith("/") || text.startsWith("//")) return null;
-  return text.slice(0, MAX_PAGE_LENGTH);
+  if (!text || !text.startsWith("/") || UNSAFE_CHARS.test(text)) return null;
+  let url: URL;
+  try {
+    url = new URL(text, SAME_ORIGIN);
+  } catch {
+    return null;
+  }
+  if (url.origin !== SAME_ORIGIN) return null;
+  return (url.pathname + url.search).slice(0, MAX_PAGE_LENGTH);
 }
 
 export default async function FeedbackPage(props: PageProps<"/feedback">) {
