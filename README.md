@@ -82,7 +82,11 @@ npm install
 cp ../.env.example .env.local   # web 구역(NEXT_PUBLIC_*, API_BASE_URL) 값만 채우고 나머지 줄은 지워도 됩니다
 npm run dev
 ```
-확인: http://localhost:3000 (화면에 "API 연결 정상" 표시), http://localhost:3000/api/health
+확인: http://localhost:3000 (화면에 "API 연결 정상" 표시), http://localhost:3000/api/health, http://localhost:3000/bids (공고 목록)
+
+> api의 `.env`에 `SUPABASE_URL`·`SUPABASE_SERVICE_ROLE_KEY`가 없으면 api가 빈 메모리 저장소를 써서 공고 목록이 비어 보입니다.
+
+> `API_BASE_URL`은 두 곳에서 쓰입니다. 브라우저의 `/api/*` 프록시(rewrites)는 **빌드 시점**에 값이 고정되고, 서버 컴포넌트의 api 호출(`web/lib/api.ts`)은 **실행 시점**에 읽습니다. Vercel `web` 프로젝트에서 값을 바꾼 뒤에는 **재배포**해야 둘 다 반영됩니다.
 
 ### Frontend (Windows PowerShell)
 ```powershell
