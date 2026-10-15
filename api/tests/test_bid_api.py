@@ -7,10 +7,10 @@ from fastapi.testclient import TestClient
 
 from app.auth import CurrentUser, get_current_user
 from app.config import Settings, get_settings
-from app.deps import get_bid_source, get_repository
+from app.deps import get_bid_source, get_fast_llm, get_repository
 from app.main import app
 from app.repository import InMemoryBidRepository
-from tests.fakes import FakeSource, make_bid
+from tests.fakes import FakeLLM, FakeSource, make_bid
 
 CRON_SECRET = "test-cron-secret"
 
@@ -26,16 +26,23 @@ def source() -> FakeSource:
 
 
 @pytest.fixture
-def client(repo: InMemoryBidRepository, source: FakeSource) -> Iterator[TestClient]:
+def llm() -> FakeLLM:
+    return FakeLLM()
+
+
+@pytest.fixture
+def client(repo: InMemoryBidRepository, source: FakeSource, llm: FakeLLM) -> Iterator[TestClient]:
     app.dependency_overrides[get_repository] = lambda: repo
     app.dependency_overrides[get_bid_source] = lambda: source
     app.dependency_overrides[get_current_user] = lambda: CurrentUser(id="user-1")
+    app.dependency_overrides[get_fast_llm] = lambda: llm
     app.dependency_overrides[get_settings] = lambda: Settings(cron_secret=CRON_SECRET, _env_file=None)
     yield TestClient(app)
     app.dependency_overrides.clear()
 
 
 def test_collect_then_list_and_detail(client: TestClient) -> None:
+    app.dependency_overrides[get_fast_llm] = lambda: None  # 요약 없는 상태의 계약 형식 확인
     response = client.post("/api/collect", json={"categories": ["용역", "공사"], "num_rows": 10})
     assert response.status_code == 200
     assert response.json() == {
@@ -147,6 +154,7 @@ def test_auth_required_endpoints_reject_missing_token(repo: InMemoryBidRepositor
     app.dependency_overrides[get_repository] = lambda: repo
     app.dependency_overrides[get_bid_source] = lambda: source
     app.dependency_overrides[get_settings] = lambda: Settings(_env_file=None)
+    app.dependency_overrides[get_fast_llm] = lambda: None
     try:
         client = TestClient(app)
         assert client.post("/api/collect").status_code == 401
@@ -155,3 +163,24 @@ def test_auth_required_endpoints_reject_missing_token(repo: InMemoryBidRepositor
         assert client.post("/api/collect", headers=headers).status_code == 503
     finally:
         app.dependency_overrides.clear()
+
+
+def test_collect_summarizes_new_bids(client: TestClient, llm: FakeLLM) -> None:
+    client.post("/api/collect", json={"categories": ["용역"]})
+
+    items = client.get("/api/bids").json()["items"]
+
+    assert len(llm.prompts) == 3
+    summary = items[0]["summary"]
+    assert summary["summary"] == "첫째 줄\n둘째 줄\n셋째 줄"
+    assert summary["ai_generated"] is True and summary["model"] == "fake-model"
+
+
+def test_collect_succeeds_even_if_summary_fails(client: TestClient) -> None:
+    app.dependency_overrides[get_fast_llm] = lambda: FakeLLM(fail_for={"공고"})
+
+    response = client.post("/api/collect")
+
+    assert response.status_code == 200
+    assert response.json()["inserted_count"] == 3
+    assert all(item["summary"] is None for item in client.get("/api/bids").json()["items"])

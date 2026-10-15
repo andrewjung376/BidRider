@@ -82,6 +82,36 @@ class SupabaseBidRepository:
         )
         return _bid_record(rows[0]) if rows else None
 
+    async def list_unsummarized(self, limit: int) -> list[BidRecord]:
+        # 임베드 + is.null 필터 = 요약이 없는 공고만 (PostgREST anti-join)
+        rows = await self._request(
+            "GET",
+            "/bids",
+            params={
+                "select": "*,bid_summaries(bid_id)",
+                "bid_summaries": "is.null",
+                "order": "bid_ntce_dt.desc.nullslast,id.desc",
+                "limit": str(limit),
+            },
+        )
+        return [_bid_record({**row, "bid_summaries": None}) for row in rows]
+
+    async def save_summary(self, bid_id: int, summary: BidSummaryRecord) -> None:
+        await self._request(
+            "POST",
+            "/bid_summaries",
+            params={"on_conflict": "bid_id"},
+            json={
+                "bid_id": bid_id,
+                "summary": summary.summary,
+                "qualifications": summary.qualifications,
+                "required_documents": summary.required_documents,
+                "provider": summary.provider,
+                "model": summary.model,
+            },
+            prefer="resolution=merge-duplicates,return=minimal",
+        )
+
     # ---------------------------------------------------------------- 수집 설정·기록
     async def get_settings(self) -> SettingsRecord:
         rows = await self._request("GET", "/collect_settings", params={"select": "*", "id": "eq.1"})

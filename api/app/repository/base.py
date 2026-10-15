@@ -92,6 +92,14 @@ class BidRepository(Protocol):
 
     async def last_manual_run_started_at(self) -> datetime | None: ...
 
+    async def list_unsummarized(self, limit: int) -> list[BidRecord]:
+        """AI 요약이 없는 공고를 공고게시일시 내림차순으로 (raw 포함)."""
+        ...
+
+    async def save_summary(self, bid_id: int, summary: BidSummaryRecord) -> None:
+        """bid_id 기준으로 저장(있으면 덮어쓰기)한다."""
+        ...
+
     async def get_profile(self, user_id: str) -> ProfileRecord | None: ...
 
     async def save_profile(self, profile: ProfileRecord) -> ProfileRecord:
