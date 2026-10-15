@@ -45,3 +45,22 @@
   - 결정: web은 DB에 직접 접근하지 않고 모든 데이터를 FastAPI로 주고받음 (Supabase 클라이언트는 로그인에만 사용)
   - 결정: 한국어 키워드 검색은 PostgreSQL 기본 FTS 대신 `pg_trgm` + `ILIKE` (기본 FTS는 한국어 형태소 미지원)
 - 협업 방식: 팀원은 별도 clone(`BidRider-member`)에서 작업하고, GitHub 이슈와 PR로만 소통
+
+### 팀원
+- Supabase 프로젝트 `bidradar` 생성 (리전 `ap-northeast-2` 서울, Free 플랜, ref `dboyvetydfgqzrpmobrk`)
+- #4 Supabase 스키마와 RLS 마이그레이션 완료 → PR #10 병합
+  - `supabase/migrations/20261015160032_init_schema.sql`: 계약서 2장 기준 테이블 7개, 제약·인덱스, `pg_trgm`(`extensions` 스키마), `collect_settings` 기본 1행
+  - RLS: `bids`·`bid_summaries` 공개 조회, `profiles`·`recommendations` 본인 행만, 나머지 3개는 api 경유 전용
+  - 계약서 외 추가: `updated_at` 자동 갱신 트리거, `recommendations.bid_id` 인덱스
+  - 검증: 컬럼·제약·인덱스·RLS·기본 행이 계약서와 일치. Supabase advisor는 INFO만 (정책 없는 테이블 3개는 의도한 상태)
+- 팀원 전용 Python 가상환경(`.venv`, 3.13.5) 생성, `api/requirements-dev.txt` 설치. api 테스트 10건 통과(실호출 1건 skip)
+
+#### 결정 사항
+| 결정 | 이유 |
+|---|---|
+| 마이그레이션 파일명을 원격 이력 버전(`20261015160032`)에 맞춤 | Supabase 커넥터로 적용한 버전과 로컬 파일이 어긋나지 않게 해서, 나중에 CLI(`db push`)를 써도 중복 적용되지 않게 함 |
+| 팀원은 팀장과 다른 가상환경 사용 | 같은 `.venv`에서 동시에 패키지 설치·테스트를 하면 충돌할 수 있음 |
+
+#### 다음 할 일
+- #5 Next.js 뼈대와 API 프록시 → 이후 #6~#9
+- 사용자 요청 필요: Google OAuth 클라이언트 생성·Supabase 등록(#7), Supabase 키를 `.env`·`web/.env.local`에 입력, Vercel 프로젝트 2개 생성
