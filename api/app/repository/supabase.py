@@ -72,8 +72,10 @@ class SupabaseBidRepository:
             ("offset", str((page - 1) * size)),
         ]
         params += _filter_params(filters)
-        response = await self._send("GET", "/bids", params=params, prefer="count=exact")
+        response = await self._send("GET", "/bids", params=params, prefer="count=exact", allow_status={416})
         total = _total_from_content_range(response.headers.get("content-range"))
+        if response.status_code == 416:  # 마지막 페이지를 넘는 offset (PGRST103): 빈 목록
+            return [], total
         return [_bid_record(row) for row in response.json()], total
 
     async def get_bid(self, bid_id: int) -> BidRecord | None:
@@ -224,6 +226,7 @@ class SupabaseBidRepository:
         params: Any = None,
         json: Any = None,
         prefer: str | None = None,
+        allow_status: set[int] | None = None,
     ) -> httpx.Response:
         headers = dict(self._headers)
         if prefer:
@@ -233,7 +236,7 @@ class SupabaseBidRepository:
                 response = await client.request(method, self._base + path, params=params, json=json, headers=headers)
         except httpx.HTTPError as exc:
             raise RepositoryError(f"Supabase {method} {path} 연결 실패: {type(exc).__name__}") from None
-        if response.status_code >= 400:
+        if response.status_code >= 400 and response.status_code not in (allow_status or set()):
             raise RepositoryError(f"Supabase {method} {path} 오류 {response.status_code}: {response.text[:300]}")
         return response
 
