@@ -1,13 +1,17 @@
 """라우터 의존성. 테스트에서는 app.dependency_overrides로 바꿔 끼운다."""
 
+import logging
 from functools import lru_cache
 
 from fastapi import Depends, HTTPException, status
 
 from app.config import Settings, get_settings
 from app.koneps.client import KonepsClient, KonepsError
+from app.llm import LLMError, LLMProvider, create_provider
 from app.repository import BidRepository, InMemoryBidRepository, SupabaseBidRepository
 from app.services.bids import BidSource
+
+logger = logging.getLogger("bidradar")
 
 
 @lru_cache
@@ -25,6 +29,20 @@ def get_repository(settings: Settings = Depends(get_settings)) -> BidRepository:
     if settings.supabase_url and settings.supabase_service_role_key:
         return _supabase_repository(settings.supabase_url, settings.supabase_service_role_key)
     return _memory_repository()
+
+
+@lru_cache
+def _fast_llm(provider: str, api_key: str, model: str) -> LLMProvider | None:
+    try:
+        return create_provider(provider, api_key=api_key, model=model)
+    except LLMError as exc:
+        logger.warning("요약용 LLM을 쓸 수 없어 요약을 건너뜁니다: %s", exc)
+        return None
+
+
+def get_fast_llm(settings: Settings = Depends(get_settings)) -> LLMProvider | None:
+    """요약·추출용 LLM. 키가 없거나 제공자가 구현되지 않았으면 None (요약 생략)."""
+    return _fast_llm(settings.llm_provider, settings.anthropic_api_key, settings.llm_model_fast)
 
 
 def get_bid_source(settings: Settings = Depends(get_settings)) -> BidSource:

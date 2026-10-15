@@ -61,6 +61,14 @@
   - 저장소 자동 선택: Supabase 설정이 있으면 Supabase, 없으면 메모리. 저장소 오류는 502 + 일반 메시지(상세는 서버 로그)
   - 키: publishable 키는 Supabase 커넥터로 조회해 `.env`에 입력, service role 키는 커넥터로 조회할 수 없어 사용자가 직접 입력
   - 테스트 35건 통과(실호출 2건 skip). 실제 Supabase에 용역 최신 10건 저장 → 재수집 시 신규 0건(중복 없음) → 목록·상세·키워드 검색 확인
+- L5 LLM 제공자와 AI 요약 (`feature/llm-summary`, FR-04)
+  - `LLMProvider` 인터페이스(`structured`)와 `ClaudeProvider`: SDK `messages.parse(output_format=Pydantic)`, effort `low`, 거절·잘림·API 오류를 `LLMError`로 변환. OpenAI는 미구현(설정 시 요약 생략)
+  - 요약 서비스: 나라장터 필드 35개 + 첨부파일명을 근거로 3줄 요약·제한 조건·제출서류. 추측 금지, "~다"체, 없는 값 언급 금지, 첨부파일은 제출서류가 아님을 명시
+  - 수집 직후 요약이 없는 공고를 동시 5건으로 요약 ("지금 수집" 25초, Cron 120초 제한). 요약 실패·시간 초과는 수집 결과에 영향 없음
+  - 실측: Supabase의 기존 10건을 Claude Haiku 5.5로 요약 → 10건 성공, 12.5초 (건당 약 2.5~5초)
+  - 프롬프트 개선 2회: ① 문체 혼용·"값 없음" 언급 → 통일·생략 지시 ② 첨부파일명을 제출서류로 분류 → 제외 지시
+  - 한계: 상세 참가자격·제출서류는 첨부파일(HWP/PDF) 안에 있어 반영 못 함 (FR-13 범위 밖)
+  - 테스트 47건 통과(실호출 2건 skip)
 
 ### 팀원
 - Supabase 프로젝트 `bidradar` 생성 (리전 `ap-northeast-2` 서울, Free 플랜, ref `dboyvetydfgqzrpmobrk`)

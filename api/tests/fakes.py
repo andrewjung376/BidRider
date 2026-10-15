@@ -45,3 +45,31 @@ class FakeSource:
         if self.fail:
             raise KonepsError("getBidPblancListInfoServc 오류 20: ACCESS DENIED")
         return self.bids_by_category.get(category, [])[:num_rows]
+
+
+class FakeLLM:
+    """요약 요청을 기록하고 정해진 결과(또는 오류)를 돌려주는 가짜 LLM."""
+
+    provider = "fake"
+    model = "fake-model"
+
+    def __init__(self, fail_for: set[str] | None = None, delay: float = 0.0) -> None:
+        self.fail_for = fail_for or set()
+        self.delay = delay
+        self.prompts: list[str] = []
+
+    async def structured(self, *, system: str, prompt: str, output_type):
+        import asyncio
+
+        from app.llm.base import LLMError
+
+        self.prompts.append(prompt)
+        if self.delay:
+            await asyncio.sleep(self.delay)
+        if any(no in prompt for no in self.fail_for):
+            raise LLMError("가짜 실패")
+        return output_type(
+            summary="  첫째 줄\n\n둘째 줄\n셋째 줄  ",
+            qualifications=" 지역제한 없음 ",
+            required_documents=["입찰참가신청서", " "],
+        )

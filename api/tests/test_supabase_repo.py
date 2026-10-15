@@ -181,3 +181,26 @@ async def test_live_supabase_read() -> None:
 
     assert settings.categories
     assert total >= 0
+
+
+@pytest.mark.anyio
+async def test_unsummarized_and_save_summary_requests() -> None:
+    from app.repository import BidSummaryRecord
+
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        if request.method == "GET":
+            return httpx.Response(200, json=[_bid_row(1, raw={"bidNtceNm": "x"}, bid_summaries=None)])
+        return httpx.Response(201)
+
+    repo = _repo(handler)
+    records = await repo.list_unsummarized(5)
+    await repo.save_summary(1, BidSummaryRecord("요약", None, [], "claude", "claude-haiku-5-5"))
+
+    get, post = calls
+    assert get.url.params["bid_summaries"] == "is.null" and get.url.params["limit"] == "5"
+    assert records[0].bid.raw == {"bidNtceNm": "x"} and records[0].summary is None
+    assert post.url.path.endswith("/bid_summaries") and post.url.params["on_conflict"] == "bid_id"
+    assert json.loads(post.content)["required_documents"] == []

@@ -4,7 +4,7 @@ from datetime import datetime, time
 from typing import Literal
 
 from app.koneps.models import KST, Bid
-from app.repository.base import BidRecord, CollectRunRecord, ProfileRecord, SettingsRecord
+from app.repository.base import BidRecord, BidSummaryRecord, CollectRunRecord, ProfileRecord, SettingsRecord
 from app.schemas import BidFilter
 
 _MIN_DT = datetime.min.replace(tzinfo=KST)
@@ -81,6 +81,16 @@ class InMemoryBidRepository:
     async def last_manual_run_started_at(self) -> datetime | None:
         manual = [r.started_at for r in self._runs if r.trigger == "manual"]
         return max(manual) if manual else None
+
+    async def list_unsummarized(self, limit: int) -> list[BidRecord]:
+        records = [r for r in self._bids.values() if r.summary is None]
+        records.sort(key=lambda r: r.bid.bid_ntce_dt or _MIN_DT, reverse=True)
+        return records[:limit]
+
+    async def save_summary(self, bid_id: int, summary: BidSummaryRecord) -> None:
+        record = await self.get_bid(bid_id)
+        if record is not None:
+            record.summary = summary
 
     async def get_profile(self, user_id: str) -> ProfileRecord | None:
         return self._profiles.get(user_id)
