@@ -21,12 +21,19 @@
 | `web`→`api` 호출은 Next.js rewrites 프록시 | 두 Vercel 프로젝트 간 CORS 회피 |
 | 테스터에게 Production URL만 공유 | Preview 배포는 기본적으로 Vercel 로그인 필요 |
 
+### 나라장터 수집 클라이언트 PoC (`api/app/koneps`)
+- 인증키 발급 후 로컬 실호출 성공: 용역·공사·물품·외자 4개 업무구분 모두 `resultCode 00`
+- **발견**: 응답이 공고게시일시 오름차순 → 최신 N건은 마지막 페이지에 있음. 1페이지로 `totalCount` 확인 후 마지막 페이지(나머지가 있으면 앞 페이지까지) 조회하도록 구현
+- Encoding/Decoding 인증키 모두 처리, 오류 메시지에서 인증키 마스킹, XML 오류 응답 처리
+- 테스트: 단위 테스트 10건(가짜 API) + 실호출 테스트 1건(`RUN_LIVE=1`일 때만) 통과
+- 로컬 확인 명령: `cd api && python -m app.koneps 용역 10`
+
 ### 확인 필요
 - Vercel Python 런타임이 `api/main.py`의 `app`을 진입점으로 인식하는지 (첫 배포 시 확인)
 - Vercel Python 버전(3.12) vs 로컬 3.13 차이로 인한 문제 여부
 - 공공데이터포털 참고문서(docx)로 오퍼레이션·파라미터 검증
 
 ### 다음 할 일
-- 팀장: 나라장터 수집 클라이언트 PoC (인증키 발급 후 호출 확인), 서비스 함수 정의, LLMProvider 인터페이스
+- 팀장: 서비스 함수(`collect_latest` 등) 정의, Supabase 저장 연동, LLMProvider 인터페이스
 - 팀원: Supabase 프로젝트(서울)·스키마·RLS·Google 로그인 설정, Next.js 스캐폴드, Vercel 프로젝트 2개 연결
 - 공통: 테스터 5명 이상 모집
