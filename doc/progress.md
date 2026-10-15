@@ -37,3 +37,11 @@
 - 팀장: 서비스 함수(`collect_latest` 등) 정의, Supabase 저장 연동, LLMProvider 인터페이스
 - 팀원: Supabase 프로젝트(서울)·스키마·RLS·Google 로그인 설정, Next.js 스캐폴드, Vercel 프로젝트 2개 연결
 - 공통: 테스터 5명 이상 모집
+
+## D2 — 2026-10-16 (금)
+
+### 팀장
+- 데이터·API 계약서(`doc/data-contract.md`) v1 작성: DB 스키마 7개 테이블과 RLS, D2 범위 API 형식
+  - 결정: web은 DB에 직접 접근하지 않고 모든 데이터를 FastAPI로 주고받음 (Supabase 클라이언트는 로그인에만 사용)
+  - 결정: 한국어 키워드 검색은 PostgreSQL 기본 FTS 대신 `pg_trgm` + `ILIKE` (기본 FTS는 한국어 형태소 미지원)
+- 협업 방식: 팀원은 별도 clone(`BidRider-member`)에서 작업하고, GitHub 이슈와 PR로만 소통

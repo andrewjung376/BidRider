@@ -8,6 +8,7 @@
 
 - 기획서: [doc/prd.md](doc/prd.md)
 - API 조사: [doc/api-research.md](doc/api-research.md)
+- 데이터·API 계약서: [doc/data-contract.md](doc/data-contract.md)
 - 진행 기록: [doc/progress.md](doc/progress.md)
 
 ## 팀원 및 역할
