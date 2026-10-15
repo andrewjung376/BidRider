@@ -43,6 +43,24 @@ export interface BidList {
   size: number;
 }
 
+// GET·PUT /api/me/profile (계약서 3.3)
+export interface ProfileFields {
+  company_name: string | null;
+  industries: string[];
+  regions: string[];
+  min_price: number | null;
+  max_price: number | null;
+  keywords: string[];
+}
+
+export interface Profile extends ProfileFields {
+  consent_at: string;
+}
+
+export interface ProfileInput extends ProfileFields {
+  consent: boolean;
+}
+
 // GET /api/bids 쿼리 파라미터 (모두 선택)
 export interface BidQuery {
   category?: Category;
