@@ -1,4 +1,7 @@
 import Link from "next/link";
+import FeedbackLink from "./feedback-link";
+
+const navLink = "text-sm text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-50";
 
 export default function SiteHeader() {
   return (
@@ -7,9 +10,10 @@ export default function SiteHeader() {
         <Link href="/" className="text-lg font-bold tracking-tight">
           BidRadar
         </Link>
-        <Link href="/bids" className="text-sm text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-50">
+        <Link href="/bids" className={navLink}>
           입찰공고
         </Link>
+        <FeedbackLink className={`${navLink} ml-auto`}>의견 보내기</FeedbackLink>
       </nav>
     </header>
   );

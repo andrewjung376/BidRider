@@ -10,6 +10,7 @@
 - API 조사: [doc/api-research.md](doc/api-research.md)
 - 데이터·API 계약서: [doc/data-contract.md](doc/data-contract.md)
 - 진행 기록: [doc/progress.md](doc/progress.md)
+- 사용자 테스트 계획: [doc/user-test.md](doc/user-test.md)
 
 ## 팀원 및 역할
 | 역할 | 담당 업무 |
