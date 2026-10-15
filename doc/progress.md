@@ -45,6 +45,15 @@
   - 결정: web은 DB에 직접 접근하지 않고 모든 데이터를 FastAPI로 주고받음 (Supabase 클라이언트는 로그인에만 사용)
   - 결정: 한국어 키워드 검색은 PostgreSQL 기본 FTS 대신 `pg_trgm` + `ILIKE` (기본 FTS는 한국어 형태소 미지원)
 - 협업 방식: 팀원은 별도 clone(`BidRider-member`)에서 작업하고, GitHub 이슈와 PR로만 소통
+- L4 공고 서비스·API (`feature/bid-service`)
+  - `BidRepository` 인터페이스와 메모리 구현체 (L6에서 Supabase 구현체로 교체)
+  - 서비스 함수(`app/services/bids.py`): `collect_latest`, `search_bids`, `get_bid_detail`, 수집 설정 조회·변경. API·Agent·FastMCP가 공통으로 호출
+  - API: `GET /api/bids`, `GET /api/bids/{id}`, `POST /api/collect`(60초 간격 제한, 429), `GET·PUT /api/settings`, `GET /api/cron/collect`(`CRON_SECRET`)
+  - 인증: Supabase Auth `/auth/v1/user`로 토큰 검증. Supabase·CRON 설정이 비어 있으면 503으로 거부 (안전한 기본값)
+  - Vercel Cron: 매일 00:00 UTC(09:00 KST)
+  - 나라장터 시각을 KST 시간대 포함 값으로 저장하도록 수정 (API 응답 `+09:00`)
+  - 테스트 26건 통과(실호출 1건 skip). 로컬 서버에서 실제 수집 → 목록·상세·키워드 검색 확인
+  - 확인: 공공데이터포털 응답이 호출당 수 초~십수 초 걸림 (Vercel 300초 제한 안에서는 문제없음)
 
 ### 팀원
 - Supabase 프로젝트 `bidradar` 생성 (리전 `ap-northeast-2` 서울, Free 플랜, ref `dboyvetydfgqzrpmobrk`)
