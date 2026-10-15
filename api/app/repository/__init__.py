@@ -1,5 +1,14 @@
-from app.repository.base import BidRecord, BidRepository, BidSummaryRecord, CollectRunRecord, SettingsRecord
+from app.repository.base import (
+    BidRecord,
+    BidRepository,
+    BidSummaryRecord,
+    CollectRunRecord,
+    ProfileRecord,
+    RepositoryError,
+    SettingsRecord,
+)
 from app.repository.memory import InMemoryBidRepository
+from app.repository.supabase import SupabaseBidRepository
 
 __all__ = [
     "BidRecord",
@@ -7,5 +16,8 @@ __all__ = [
     "BidSummaryRecord",
     "CollectRunRecord",
     "InMemoryBidRepository",
+    "ProfileRecord",
+    "RepositoryError",
     "SettingsRecord",
+    "SupabaseBidRepository",
 ]

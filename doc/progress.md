@@ -54,6 +54,13 @@
   - 나라장터 시각을 KST 시간대 포함 값으로 저장하도록 수정 (API 응답 `+09:00`)
   - 테스트 26건 통과(실호출 1건 skip). 로컬 서버에서 실제 수집 → 목록·상세·키워드 검색 확인
   - 확인: 공공데이터포털 응답이 호출당 수 초~십수 초 걸림 (Vercel 300초 제한 안에서는 문제없음)
+- L6 Supabase 저장 연동 (`feature/supabase-repo`)
+  - `SupabaseBidRepository`: 새 라이브러리 없이 httpx로 PostgREST 호출. 공고 upsert(`on_conflict`)와 신규 건수 계산, 필터·전체 건수(`count=exact`)·요약 함께 조회, 수집 설정·실행 기록, 프로필, 피드백
+  - DB 시각(UTC)을 KST로 바꿔 응답 (`+09:00`)
+  - API 추가: `GET·PUT /api/me/profile`(처음 저장 시 동의 필수, 최초 동의 시각 유지), `POST /api/feedback`(비로그인 허용)
+  - 저장소 자동 선택: Supabase 설정이 있으면 Supabase, 없으면 메모리. 저장소 오류는 502 + 일반 메시지(상세는 서버 로그)
+  - 키: publishable 키는 Supabase 커넥터로 조회해 `.env`에 입력, service role 키는 커넥터로 조회할 수 없어 사용자가 직접 입력
+  - 테스트 35건 통과(실호출 2건 skip). 실제 Supabase에 용역 최신 10건 저장 → 재수집 시 신규 0건(중복 없음) → 목록·상세·키워드 검색 확인
 
 ### 팀원
 - Supabase 프로젝트 `bidradar` 생성 (리전 `ap-northeast-2` 서울, Free 플랜, ref `dboyvetydfgqzrpmobrk`)

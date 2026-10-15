@@ -85,3 +85,30 @@ class SettingsOut(BaseModel):
     categories: list[Category]
     num_rows: int
     updated_at: datetime
+
+
+class ProfileBase(BaseModel):
+    company_name: str | None = None
+    industries: list[str] = []
+    regions: list[str] = []
+    min_price: int | None = Field(default=None, ge=0)
+    max_price: int | None = Field(default=None, ge=0)
+    keywords: list[str] = []
+
+
+class ProfileIn(ProfileBase):
+    consent: bool = False  # 처음 저장할 때 true 필수 (NFR-05)
+
+
+class ProfileOut(ProfileBase):
+    consent_at: datetime
+
+
+class FeedbackIn(BaseModel):
+    rating: int = Field(ge=1, le=5)
+    message: str = Field(min_length=1, max_length=2000)
+    page: str | None = Field(default=None, max_length=200)
+
+
+class FeedbackOut(BaseModel):
+    id: int

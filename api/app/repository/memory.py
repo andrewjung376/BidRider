@@ -4,7 +4,7 @@ from datetime import datetime, time
 from typing import Literal
 
 from app.koneps.models import KST, Bid
-from app.repository.base import BidRecord, CollectRunRecord, SettingsRecord
+from app.repository.base import BidRecord, CollectRunRecord, ProfileRecord, SettingsRecord
 from app.schemas import BidFilter
 
 _MIN_DT = datetime.min.replace(tzinfo=KST)
@@ -16,6 +16,8 @@ class InMemoryBidRepository:
         self._next_id = 1
         self._settings = SettingsRecord(categories=["용역"], num_rows=10, updated_at=datetime.now(KST))
         self._runs: list[CollectRunRecord] = []
+        self._profiles: dict[str, ProfileRecord] = {}
+        self._feedbacks: list[dict] = []
 
     async def upsert_bids(self, bids: list[Bid]) -> int:
         inserted = 0
@@ -80,9 +82,24 @@ class InMemoryBidRepository:
         manual = [r.started_at for r in self._runs if r.trigger == "manual"]
         return max(manual) if manual else None
 
+    async def get_profile(self, user_id: str) -> ProfileRecord | None:
+        return self._profiles.get(user_id)
+
+    async def save_profile(self, profile: ProfileRecord) -> ProfileRecord:
+        self._profiles[profile.user_id] = profile
+        return profile
+
+    async def add_feedback(self, user_id: str | None, rating: int, message: str, page: str | None) -> int:
+        self._feedbacks.append({"user_id": user_id, "rating": rating, "message": message, "page": page})
+        return len(self._feedbacks)
+
     @property
     def runs(self) -> list[CollectRunRecord]:
         return self._runs
+
+    @property
+    def feedbacks(self) -> list[dict]:
+        return self._feedbacks
 
 
 def _matches(bid: Bid, f: BidFilter) -> bool:
