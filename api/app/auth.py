@@ -47,6 +47,16 @@ async def get_current_user(
     return CurrentUser(id=data["id"], email=data.get("email"))
 
 
+async def get_optional_user(
+    authorization: str | None = Header(default=None),
+    settings: Settings = Depends(get_settings),
+) -> CurrentUser | None:
+    """토큰이 없으면 None, 있으면 검증한다 (로그인 없이도 쓸 수 있는 API용)."""
+    if not authorization:
+        return None
+    return await get_current_user(authorization, settings)
+
+
 def verify_cron_secret(
     authorization: str | None = Header(default=None),
     settings: Settings = Depends(get_settings),

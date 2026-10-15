@@ -46,6 +46,22 @@ class CollectRunRecord:
     finished_at: datetime | None = None
 
 
+@dataclass
+class ProfileRecord:
+    user_id: str
+    company_name: str | None
+    industries: list[str]
+    regions: list[str]
+    min_price: int | None
+    max_price: int | None
+    keywords: list[str]
+    consent_at: datetime
+
+
+class RepositoryError(Exception):
+    """저장소(Supabase) 호출 실패."""
+
+
 class BidRepository(Protocol):
     async def upsert_bids(self, bids: list[Bid]) -> int:
         """(공고번호, 차수) 기준으로 저장하고, 새로 추가된 건수를 반환한다."""
@@ -75,3 +91,13 @@ class BidRepository(Protocol):
     ) -> None: ...
 
     async def last_manual_run_started_at(self) -> datetime | None: ...
+
+    async def get_profile(self, user_id: str) -> ProfileRecord | None: ...
+
+    async def save_profile(self, profile: ProfileRecord) -> ProfileRecord:
+        """user_id 기준으로 저장(있으면 덮어쓰기)한다."""
+        ...
+
+    async def add_feedback(self, user_id: str | None, rating: int, message: str, page: str | None) -> int:
+        """저장한 피드백 id를 반환한다."""
+        ...

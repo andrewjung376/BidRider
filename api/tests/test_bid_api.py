@@ -109,6 +109,39 @@ def test_cron_disabled_without_secret(client: TestClient) -> None:
     assert client.get("/api/cron/collect", headers={"Authorization": "Bearer "}).status_code == 503
 
 
+def test_profile_requires_consent_on_first_save(client: TestClient) -> None:
+    assert client.get("/api/me/profile").status_code == 404
+
+    body = {"company_name": "예시소프트", "industries": ["소프트웨어 개발"], "regions": ["서울"], "keywords": ["GIS"]}
+    assert client.put("/api/me/profile", json=body).status_code == 400  # 동의 없음
+
+    saved = client.put("/api/me/profile", json={**body, "consent": True})
+    assert saved.status_code == 200
+    consent_at = saved.json()["consent_at"]
+    assert consent_at.endswith("+09:00")
+
+    # 이후 수정은 동의 재확인 없이 가능하고, 최초 동의 시각은 유지된다
+    updated = client.put("/api/me/profile", json={**body, "regions": ["경기"]}).json()
+    assert updated["regions"] == ["경기"] and updated["consent_at"] == consent_at
+    assert client.get("/api/me/profile").json()["regions"] == ["경기"]
+
+
+def test_profile_price_range_validation(client: TestClient) -> None:
+    body = {"min_price": 200, "max_price": 100, "consent": True}
+    assert client.put("/api/me/profile", json=body).status_code == 400
+
+
+def test_feedback_without_login(client: TestClient, repo: InMemoryBidRepository) -> None:
+    app.dependency_overrides.pop(get_current_user)  # 실제 의존성: 토큰이 없으면 비로그인으로 처리
+    response = client.post("/api/feedback", json={"rating": 4, "message": " 목록이 보기 편해요 ", "page": "/bids"})
+
+    assert response.status_code == 201
+    assert response.json() == {"id": 1}
+    assert repo.feedbacks[0] == {"user_id": None, "rating": 4, "message": "목록이 보기 편해요", "page": "/bids"}
+    assert client.post("/api/feedback", json={"rating": 6, "message": "x"}).status_code == 422
+    assert client.post("/api/feedback", json={"rating": 3, "message": ""}).status_code == 422
+
+
 def test_auth_required_endpoints_reject_missing_token(repo: InMemoryBidRepository, source: FakeSource) -> None:
     """실제 인증 의존성 사용: 토큰이 없으면 401, Supabase 설정이 없으면 503."""
     app.dependency_overrides[get_repository] = lambda: repo
