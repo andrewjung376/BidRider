@@ -41,7 +41,8 @@ BidRider/
 ├─ api/          FastAPI 백엔드 (Vercel Python 함수)
 │  ├─ app/       애플리케이션 코드
 │  └─ tests/     pytest
-├─ web/          Next.js 프런트엔드 (예정)
+├─ web/          Next.js 프런트엔드 (App Router, TypeScript, Tailwind)
+├─ supabase/     DB 마이그레이션 (스키마·RLS)
 ├─ doc/          기획·조사·진행 문서
 └─ .env.example  환경 변수 예시
 ```
@@ -49,7 +50,7 @@ BidRider/
 ## 실행 방법
 ### 요구사항
 - Python 3.12 이상
-- Node.js 20 이상 (web, 예정)
+- Node.js 20 이상 (web)
 
 ### 환경 변수
 `.env.example`을 `.env`로 복사한 뒤 값을 채웁니다. `.env`는 커밋하지 않습니다.
@@ -73,10 +74,33 @@ cd api
 uvicorn app.main:app --reload
 ```
 
+### Frontend (Bash)
+api를 먼저 띄운 상태에서 다른 터미널로 실행합니다. `/api/*` 요청은 `API_BASE_URL`(기본 `http://127.0.0.1:8000`)로 프록시됩니다.
+```bash
+cd web
+npm install
+cp ../.env.example .env.local   # web 구역(NEXT_PUBLIC_*, API_BASE_URL) 값만 채우고 나머지 줄은 지워도 됩니다
+npm run dev
+```
+확인: http://localhost:3000 (화면에 "API 연결 정상" 표시), http://localhost:3000/api/health
+
+### Frontend (Windows PowerShell)
+```powershell
+cd web
+npm install
+Copy-Item ..\.env.example .env.local
+npm run dev
+```
+
 ### 테스트
 ```bash
 cd api
 pytest
+```
+```bash
+cd web
+npm run lint
+npm run build
 ```
 
 ## AI 윤리
