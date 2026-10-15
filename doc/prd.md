@@ -35,10 +35,10 @@
 ## 5. 기술 스택과 선정 근거
 | 구분 | 기술 | 선정 근거 |
 |---|---|---|
-| 언어 | **Python 3.12** | 공공 API 호출, 데이터 처리, LLM SDK, MCP 생태계를 하나의 언어로 처리할 수 있고, 과정에서 배운 언어라 학습 비용이 없다 |
+| 언어 | **Python 3.12+** (로컬 3.13) | 공공 API 호출, 데이터 처리, LLM SDK, MCP 생태계를 하나의 언어로 처리할 수 있고, 과정에서 배운 언어라 학습 비용이 없다 |
 | Backend | **FastAPI** | 타입 힌트와 Pydantic으로 API 응답과 LLM 구조화 출력을 같은 스키마로 검증할 수 있다. 비동기 I/O로 외부 API·LLM 호출에 유리하다. Vercel Python 런타임에서 ASGI 앱으로 바로 배포할 수 있다 |
-| MCP | **FastMCP** | 데코레이터만으로 MCP 도구를 정의하므로 개발 시간이 짧다. 같은 도구를 ① 내부 Agent에서는 in-memory 클라이언트로, ② 외부 MCP 클라이언트(Claude Desktop 등)에서는 `/mcp` 엔드포인트로 재사용할 수 있다 |
-| DB / Auth | **Supabase** (필수) | PostgreSQL에 Auth, 전문검색(FTS), RLS, 무료 티어까지 갖춰 별도 서버 없이 영속 저장, 사용자별 메모리, 검색을 해결한다 |
+| MCP | **FastMCP** (Should, 외부 연동 층) | 데코레이터만으로 MCP 도구를 정의하므로 개발 시간이 짧다. 도구 로직은 서비스 함수(`app/services`)에 한 번만 정의하고, FastMCP는 이를 감싸 `/mcp`로 외부 MCP 클라이언트(Claude Desktop 등)에 노출한다. **내부 Agent는 MCP를 거치지 않고** LLM SDK의 tool calling으로 서비스 함수를 직접 호출하므로, Must 기능은 FastMCP에 의존하지 않는다 (5.2절) |
+| DB / Auth | **Supabase** (필수) | PostgreSQL에 Auth, 전문검색(FTS), RLS, 무료 티어까지 갖춰 별도 서버 없이 영속 저장, 사용자별 메모리, 검색을 해결한다. 로그인은 **Google 로그인**을 쓴다 (5.3절) |
 | Frontend | **Next.js** (App Router, TypeScript) | Vercel과 함께 쓰는 프레임워크라 배포 설정이 거의 필요 없고, 목록·필터·채팅 UI를 빠르게 구성할 수 있다 |
 | 배포 / 스케줄 | **Vercel** | 프런트엔드와 Python 백엔드를 같은 플랫폼에 배포하고, Git push만으로 자동 배포된다. Vercel Cron으로 정기 수집을 실행한다 |
 | 자동화 | **n8n** (선택) | Supabase → Google Sheets 동기화와 이메일·Slack 알림을 코드 없이 연결한다. 핵심 경로가 아니라 확장 기능으로 둔다 |
@@ -47,8 +47,33 @@
 ### 5.1 LLM 제공자 선택 구조
 - `LLMProvider` 인터페이스(`summarize`, `extract`, `chat_with_tools`)를 두고, 구현체 `ClaudeProvider`(기본)와 `OpenAIProvider`(선택)를 둔다.
 - 제공자와 모델은 환경 변수로 선택한다: `LLM_PROVIDER=claude|openai`, `LLM_MODEL_FAST`, `LLM_MODEL_AGENT`.
-- MCP 도구 정의는 제공자와 상관없이 같은 것을 쓴다. Agent 루프에서만 제공자별 tool-call 형식을 변환한다.
+- 도구 정의(이름, 설명, 입력 스키마)는 제공자와 상관없이 같은 것을 쓴다. Agent 루프에서만 제공자별 tool-call 형식을 변환한다.
 - OpenAI를 고르면 임베딩 API를 쓸 수 있으므로, 진도에 여유가 있으면 FTS 기반 RAG를 Supabase pgvector 기반 벡터 RAG로 확장할 수 있다 (선택).
+
+### 5.2 도구 계층 구조 (FastMCP 활용 방식)
+```
+app/services/bids.py    ← 도구의 실제 로직 (search_bids, get_bid_detail, collect_latest)
+   ├─ Bid Agent          ← LLM SDK tool calling으로 직접 호출 (Must)
+   └─ app/mcp_server.py  ← FastMCP로 같은 함수를 감싸 /mcp로 노출 (FR-10, Should)
+```
+- FastMCP는 project.md의 필수 요건이 아니다. 외부 MCP 클라이언트 연동과 시연용으로만 쓴다.
+- 일정이 밀리거나 서버리스 환경에서 `/mcp`가 동작하지 않으면 FR-10만 제외하고, 핵심 기능에는 영향이 없다.
+
+### 5.3 무료 플랜 제약 검토 (Vercel Hobby, Supabase Free)
+| 항목 | 제약 | 대응 |
+|---|---|---|
+| Vercel 함수 실행 시간 | 기본·최대 300초 (Fluid compute) | Agent 응답 목표 10초로 충분 |
+| Vercel 메모리·번들 | 메모리 2GB, Python 번들 500MB | 무거운 라이브러리 제외 |
+| Vercel 함수 리전 | Hobby는 단일 리전, 기본값 `iad1`(미국) | **`icn1`(서울)로 지정** (공공데이터포털 해외 IP 차단 대응) |
+| Vercel Cron | 하루 1회, 실행 시각 ±59분 | "지금 수집" 버튼 병행 |
+| 서버리스에서의 `/mcp` | 상시 연결(세션, 장기 SSE) 불가 | FastMCP를 stateless HTTP로 제공, PoC로 확인 |
+| `web`·`api` 도메인 분리 | CORS 문제 | Next.js rewrites로 `/api/*`를 api 프로젝트로 프록시 |
+| Preview 배포 | 기본적으로 Vercel 로그인 필요 | 테스터에게는 **Production URL**만 공유 |
+| Hobby 이용 조건 | 비상업 용도만 허용 | 과제용이므로 해당 없음 |
+| **Supabase Auth 이메일** | 기본 발송기는 프로젝트 전체 **시간당 2통** | 매직 링크 대신 **Google 로그인** 사용 (이메일 발송 없음) |
+| Supabase DB | 500MB | 공고·요약 데이터로 충분 |
+| Supabase 일시정지 | 7일 동안 활동이 없으면 정지, 직접 재개 필요 | 제출 후 평가 기간에 접속 상태를 확인하고, 정지되면 재개 |
+| Supabase 리전 | 선택 가능 | 서울(`ap-northeast-2`)로 Vercel `icn1`과 맞춤 |
 
 ## 6. 기술 스택 검토: 불합리한 점과 조치
 | # | 불합리한 점 / 누락 | 영향 | 조치 |
@@ -59,17 +84,18 @@
 | 4 | **Vercel 서버리스 함수의 실행 시간·번들 크기 제한** | 공고 10건 요약을 순차로 처리하면 시간 초과 위험, 무거운 라이브러리(HWP 파서, 로컬 임베딩)는 배포 불가 | 요약은 비동기 병렬 호출로 처리. HWP 파싱과 로컬 임베딩은 범위에서 제외 |
 | 5 | **Claude API에 임베딩 모델이 없음** | 벡터 RAG를 하려면 임베딩 제공자를 하나 더 추가해야 함 | 기본은 **Supabase PostgreSQL 전문검색(FTS)으로 검색**하고 그 결과를 근거로 생성. OpenAI를 고르면 벡터 RAG로 확장 가능 (5.1절) |
 | 6 | **n8n은 호스팅이 필요** (n8n Cloud 유료 / 자체 서버 필요) | 5일 안에 별도 인프라를 구축해야 하는 부담 | n8n은 **선택 사항**. 핵심 파이프라인(수집 → 요약 → 저장)은 FastAPI와 Vercel Cron만으로 완결 |
-| 7 | **FastMCP 서버를 별도 프로세스로 띄우면 Vercel 배포가 복잡해짐** | 서버리스 환경에서 상시 실행 프로세스를 둘 수 없음 | FastMCP 앱을 FastAPI에 마운트해 **Stateless Streamable HTTP**로 제공하고, 내부 Agent는 in-memory 클라이언트로 호출 |
+| 7 | **FastMCP 서버를 별도 프로세스로 띄우면 Vercel 배포가 복잡해짐** | 서버리스 환경에서 상시 실행 프로세스를 둘 수 없음 | FastMCP 앱을 FastAPI에 마운트해 **Stateless Streamable HTTP**로 제공. 내부 Agent는 MCP를 거치지 않고 서비스 함수를 직접 호출 (5.2절) |
 | 8 | **Next.js와 Python을 한 Vercel 프로젝트에 같이 두면 설정이 복잡해짐** | 빌드·라우팅 충돌 가능성 | **Vercel 프로젝트를 2개로 분리** (`web`: Next.js, `api`: FastAPI). 같은 저장소의 모노레포로 관리 |
 | 9 | **공공데이터포털 API 활용 승인과 일일 호출 한도** | 개발계정 1,000건/일. 승인이 늦어지면 1일차 개발이 막힘 (자동승인이므로 신청 즉시 발급) | 활용신청 후 인증키 발급. 응답을 캐시하고 공고번호 기준으로 증분 저장. "지금 수집" 버튼에 호출 간격 제한 |
 | 9-1 | **공공데이터포털의 해외 IP 차단 가능성 (미검증)** | Vercel 함수가 해외 리전이면 수집 호출이 실패할 수 있음 | 함수 리전을 서울(icn1)로 지정하고, D1 PoC에서 가장 먼저 확인 |
+| 9-2 | **Supabase 기본 이메일 발송 한도 (시간당 2통)** | 매직 링크 로그인으로는 테스터 5명이 로그인할 수 없음 | **Google 로그인으로 변경** (FR-05) |
 | 10 | **5일 일정 안에 사용자 테스트와 반영까지 해야 함** | 피드백을 반영할 시간이 하루뿐 | 1일차부터 테스터 모집, 4일차 오전에 배포 후 테스트, 5일차에 상위 피드백 2~3건만 반영 |
 
 ## 7. 필수 기술 요소 (4개 적용, 요건은 2개 이상)
 | 기술 요소 | 적용 내용 | 우선순위 |
 |---|---|---|
 | **자동화 워크플로우** | Vercel Cron → 수집 → AI 요약 → Supabase 저장 (선택: n8n으로 Sheets 동기화·알림) | Must |
-| **AI Agent** | Bid Agent가 사용자 의도를 해석해 FastMCP 도구(`search_bids`, `get_bid_detail`, `collect_latest`)를 호출하고 답변 | Must |
+| **AI Agent** | Bid Agent가 사용자 의도를 해석해 도구(`search_bids`, `get_bid_detail`, `collect_latest`)를 LLM tool calling으로 호출하고 답변. 같은 도구를 FastMCP로 외부에도 노출 (Should) | Must |
 | **Long-term Memory** | 사용자별 회사 프로필(업종, 지역, 금액 범위, 키워드)과 추천 피드백(👍/👎)을 저장해 적합도 판단에 반영 | Must |
 | **RAG** | 사용자 질문으로 공고 DB를 FTS 검색하고, 찾은 공고를 근거로 인용해 답변 생성 | Should |
 
@@ -80,12 +106,12 @@
 | FR-02 | 정기·수동 수집 | Vercel Cron 하루 1회 실행과 "지금 수집" 버튼 (수동 수집 시 업무 구분 선택 가능) | Must | 팀장 |
 | FR-03 | 공고 목록·조회 | 목록, 상세, 필터(업무 구분, 기관, 금액, 마감일, 키워드), 원문 링크 | Must | 팀원 |
 | FR-04 | AI 요약 카드 | 3줄 요약과 구조화 필드(참가자격, 추정가격, 마감일, 제출서류) | Must | 팀장 |
-| FR-05 | 회사 프로필 | 로그인(Supabase 이메일 매직 링크) 후 프로필 저장 | Must | 팀원 |
+| FR-05 | 회사 프로필 | 로그인(Supabase **Google 로그인**) 후 프로필 저장 | Must | 팀원 |
 | FR-06 | 적합도 추천 | 프로필 기준 적합도 점수(0~100)와 판단 근거 | Must | 팀장 |
 | FR-07 | 자연어 검색 Agent | "서울 SW 개발 1억 이하 이번 주 마감" 같은 요청을 처리하는 채팅 UI | Must | 팀장(Agent) / 팀원(UI) |
 | FR-08 | 추천 피드백 | 👍/👎를 Memory에 저장해 다음 추천에 반영 | Should | 팀원 |
 | FR-09 | 공고 근거 Q&A (RAG) | FTS 검색 결과를 인용해 답변 | Should | 팀장 |
-| FR-10 | 외부 MCP 엔드포인트 | `/mcp`로 Claude Desktop 등에서 도구 사용 | Should | 팀장 |
+| FR-10 | 외부 MCP 엔드포인트 | `/mcp`(FastMCP, stateless HTTP)로 Claude Desktop 등에서 도구 사용. 서비스 함수를 감싸는 얇은 층 | Should | 팀장 |
 | FR-11 | 피드백 수집 | 서비스 안에 피드백 폼(또는 Google Form 링크) | Must | 팀원 |
 | FR-12 | Sheets 동기화·알림 | n8n으로 Google Sheets 동기화, 이메일·Slack 알림 | Could | 팀원 |
 | FR-13 | 첨부 공고문 Q&A | PDF 첨부파일 분석 (HWP 제외) | Won't (이번 범위 제외) | — |
@@ -101,19 +127,20 @@
 | NFR-04 | AI 윤리 | AI 생성 콘텐츠에 "AI 생성" 배지를 붙이고 원문 링크를 반드시 함께 표시. 추천은 참고용임을 고지 |
 | NFR-05 | 개인정보 | 가입 시 수집 항목(이메일, 회사 프로필)과 이용 목적에 대한 동의를 받고, 탈퇴 시 데이터 삭제 |
 | NFR-06 | 비용 | 무료 티어 안에서 운영 (Vercel Hobby, Supabase Free). LLM 비용은 1만 원 이하 목표 |
-| NFR-07 | 확장성 | LLM 제공자를 바꿔도 MCP 도구, DB, UI 코드는 수정하지 않음 |
+| NFR-07 | 확장성 | LLM 제공자를 바꿔도 서비스 함수, MCP 도구, DB, UI 코드는 수정하지 않음 |
+| NFR-08 | 배포 환경 | Vercel 함수 리전 `icn1`(서울), Supabase 리전 서울. 테스터에게는 Production URL만 공유 |
 
 ## 10. 시스템 아키텍처
 ```
-                 ┌──────────── Vercel ────────────┐
-[사용자] ──► [web: Next.js] ──► [api: FastAPI] ──► LLMProvider ─┬─ Claude API (기본: Haiku 요약 / Sonnet Agent)
-                                 │                                └─ OpenAI API (선택)
-                                 │   ├─ Bid Agent ──(in-memory)──► FastMCP tools
-                                 │   ├─ /mcp (Streamable HTTP) ◄── 외부 MCP 클라이언트
-                                 │   └─ /api/cron/collect ◄── Vercel Cron (하루 1회)
-                                 │            └─► 공공데이터포털 나라장터 OpenAPI
-                                 ▼
-                     [Supabase: Postgres + FTS + Auth + RLS]
+                 ┌──────────── Vercel (icn1, 서울) ────────────┐
+[사용자] ──► [web: Next.js] ──(rewrites /api/*)──► [api: FastAPI] ──► LLMProvider ─┬─ Claude API (기본: Haiku 요약 / Sonnet Agent)
+                                                    │                               └─ OpenAI API (선택)
+                                                    │   ├─ Bid Agent ──(tool calling)──► services (search_bids 등)
+                                                    │   ├─ /mcp (FastMCP, stateless) ──► services ◄── 외부 MCP 클라이언트 (Should)
+                                                    │   └─ /api/cron/collect ◄── Vercel Cron (하루 1회)
+                                                    │            └─► 공공데이터포털 나라장터 OpenAPI
+                                                    ▼
+                     [Supabase (서울): Postgres + FTS + Auth(Google) + RLS]
                                  ▲
                      [n8n (선택): Sheets 동기화 / 알림]
 ```
@@ -140,7 +167,7 @@
 ## 12. 팀 구성과 역할
 | 역할 | 담당 업무 |
 |---|---|
-| **팀장** (PM / Backend / AI) | 일정·Git 관리, 공공 API 수집기, FastMCP 도구, FastAPI, LLMProvider 추상화, Bid Agent, 요약·추천 프롬프트, Vercel Cron |
+| **팀장** (PM / Backend / AI) | 일정·Git 관리, 공공 API 수집기, 서비스 함수(도구)와 FastMCP 노출, FastAPI, LLMProvider 추상화, Bid Agent, 요약·추천 프롬프트, Vercel Cron |
 | **팀원** (Frontend / Data / QA) | Next.js UI(목록, 상세, 채팅, 프로필, 수집 설정), Supabase 스키마·Auth·RLS, 피드백 폼, 사용자 테스트 운영과 결과 정리, (선택) n8n |
 
 - 기능 단위 브랜치(`feature/*`)에서 작업하고, PR은 상대방이 리뷰한 뒤 `main`에 병합한다. 커밋과 PR 기록으로 두 사람의 기여를 증빙한다.
@@ -148,7 +175,7 @@
 ## 13. 일정 (2026-10-15 ~ 10-21, 영업일 5일)
 | 일자 | 팀장 | 팀원 | 마일스톤 |
 |---|---|---|---|
-| **10/15(목)** D1 | PRD·명세 확정, OpenAPI 연동 PoC, FastMCP 도구 정의, LLMProvider 인터페이스 | Supabase 스키마·RLS, Next.js 스캐폴드, Vercel 프로젝트 2개 연결, **테스터 모집** | 빈 화면이라도 배포 파이프라인 동작 |
+| **10/15(목)** D1 | PRD·명세 확정, 저장소 뼈대·가상환경, OpenAPI 연동 PoC, 서비스 함수(도구) 정의, LLMProvider 인터페이스 | Supabase 스키마·RLS·Google 로그인 설정, Next.js 스캐폴드, Vercel 프로젝트 2개 연결(리전 `icn1`), **테스터 모집** | 빈 화면이라도 배포 파이프라인 동작 |
 | **10/16(금)** D2 | 수집 → 저장 파이프라인, Cron, 수집 설정 연동, AI 요약 (FR-01·02·04·14) | 목록·상세·필터 UI, 수집 설정 화면, 로그인·프로필 (FR-03·05·14) | 수집된 공고가 웹에서 조회됨 |
 | **10/19(월)** D3 | Bid Agent, 적합도 추천, `/mcp` (FR-06·07·10) | 채팅 UI, AI 배지, 👍/👎, 피드백 폼 (FR-07·08·11) | **기능 통합, 1차 배포** |
 | **10/20(화)** D4 | 버그 수정, 프롬프트 개선, RAG Q&A, (여유 시) OpenAI 제공자 (FR-09·15) | **사용자 테스트 5명 이상 진행**, 피드백 정리, (선택) n8n | 피드백 목록 확정 |
