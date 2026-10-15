@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     # Supabase
     supabase_url: str = ""
     supabase_service_role_key: str = ""
+    supabase_anon_key: str = ""  # 로그인 토큰 검증 호출용
 
     # Vercel Cron 보호 (NFR-03)
     cron_secret: str = ""

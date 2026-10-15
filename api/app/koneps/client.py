@@ -6,15 +6,13 @@
 """
 
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Any
 from urllib.parse import unquote
 
 import httpx
 
-from app.koneps.models import Bid
-
-KST = timezone(timedelta(hours=9))
+from app.koneps.models import KST, Bid
 
 CATEGORY_OPERATIONS: dict[str, str] = {
     "용역": "getBidPblancListInfoServc",
@@ -84,7 +82,7 @@ class KonepsClient:
                 items.extend(self._items(body))
 
         bids = [Bid.from_item(item, category) for item in items]
-        bids.sort(key=lambda b: b.bid_ntce_dt or datetime.min, reverse=True)
+        bids.sort(key=lambda b: b.bid_ntce_dt or datetime.min.replace(tzinfo=KST), reverse=True)
         return bids[:num_rows]
 
     async def _call(self, client: httpx.AsyncClient, operation: str, params: dict[str, Any]) -> dict[str, Any]:

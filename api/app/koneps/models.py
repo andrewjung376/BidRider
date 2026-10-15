@@ -1,17 +1,20 @@
 """입찰공고 응답 모델. 서비스에서 쓰는 필드만 꺼내고 원본은 raw에 보관한다."""
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from pydantic import BaseModel
 
+KST = timezone(timedelta(hours=9))
+
 
 def _parse_dt(value: str | None) -> datetime | None:
+    """나라장터 시각(KST, 시간대 표기 없음)을 KST 시간대가 붙은 datetime으로 바꾼다."""
     if not value:
         return None
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
         try:
-            return datetime.strptime(value, fmt)
+            return datetime.strptime(value, fmt).replace(tzinfo=KST)
         except ValueError:
             continue
     return None
