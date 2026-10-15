@@ -2,20 +2,26 @@ import Link from "next/link";
 import AuthButton from "./auth-button";
 import FeedbackLink from "./feedback-link";
 
-const navLink = "text-sm text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-50";
+const navLink = "whitespace-nowrap text-sm text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-50";
 
 export default function SiteHeader() {
   return (
     <header className="border-b border-zinc-200 bg-white/80 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/80">
-      <nav className="mx-auto flex h-14 w-full max-w-5xl items-center gap-4 px-4 sm:gap-6 sm:px-6">
+      <nav className="mx-auto flex h-14 w-full max-w-5xl items-center gap-3 px-4 sm:gap-6 sm:px-6">
         <Link href="/" className="text-lg font-bold tracking-tight">
           BidRadar
         </Link>
         <Link href="/bids" className={navLink}>
           입찰공고
         </Link>
-        <FeedbackLink className={`${navLink} ml-auto`}>의견 보내기</FeedbackLink>
-        <AuthButton />
+        <Link href="/settings" className={navLink}>
+          수집 설정
+        </Link>
+        <div className="ml-auto flex items-center gap-3 sm:gap-6">
+          {/* 휴대폰 폭에서는 하단(footer)의 의견 보내기 링크를 쓴다 */}
+          <FeedbackLink className={`${navLink} hidden sm:inline`}>의견 보내기</FeedbackLink>
+          <AuthButton />
+        </div>
       </nav>
     </header>
   );

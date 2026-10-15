@@ -1,5 +1,13 @@
+import { connection } from "next/server";
 import { cache } from "react";
-import { CATEGORIES, type BidDetail, type BidList, type BidQuery, type Category } from "./types";
+import {
+  CATEGORIES,
+  type BidDetail,
+  type BidList,
+  type BidQuery,
+  type Category,
+  type CollectSettings,
+} from "./types";
 
 // 서버 컴포넌트에서 api를 직접 호출한다 (브라우저의 /api/* 요청은 next.config.ts rewrites가 프록시).
 // rewrites와 달리 이 값은 실행 시점에 읽는다.
@@ -18,6 +26,8 @@ export class ApiError extends Error {
 }
 
 async function getJson<T>(path: string): Promise<T> {
+  // api 데이터는 요청마다 새로 읽는다 (빌드 시점에 미리 렌더링하지 않음)
+  await connection();
   let res: Response;
   try {
     res = await fetch(`${API_BASE_URL}${path}`, { cache: "no-store" });
@@ -78,6 +88,10 @@ export async function fetchBids(query: BidQuery): Promise<BidList> {
   const params = toSearchParams(query);
   params.set("size", String(PAGE_SIZE));
   return getJson<BidList>(`/api/bids?${params}`);
+}
+
+export async function fetchSettings(): Promise<CollectSettings> {
+  return getJson<CollectSettings>("/api/settings");
 }
 
 /** 공고 상세. 없으면 null. generateMetadata와 페이지가 같은 요청을 공유하도록 cache로 감싼다. */

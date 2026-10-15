@@ -5,6 +5,10 @@ export class ClientApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    /** 429 응답의 Retry-After(초) */
+    public retryAfter: number | null = null,
+    /** 요청 제한 시간(signal)을 넘겨 화면에서 기다리기를 멈춤 */
+    public timedOut = false,
   ) {
     super(message);
     this.name = "ClientApiError";
@@ -33,9 +37,17 @@ export async function apiFetch<T>(
   try {
     res = await fetch(path, { ...init, headers });
   } catch {
+    if (init.signal?.aborted) throw new ClientApiError(0, "응답 시간이 초과되었습니다.", null, true);
     throw new ClientApiError(0, "서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.");
   }
   const body = await res.json().catch(() => null);
-  if (!res.ok) throw new ClientApiError(res.status, detailMessage(res.status, body));
+  if (!res.ok) {
+    const retryAfter = Number(res.headers.get("Retry-After"));
+    throw new ClientApiError(
+      res.status,
+      detailMessage(res.status, body),
+      Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : null,
+    );
+  }
   return { status: res.status, data: body as T };
 }

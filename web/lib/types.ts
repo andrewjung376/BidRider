@@ -43,6 +43,22 @@ export interface BidList {
   size: number;
 }
 
+// GET·PUT /api/settings (계약서 3.3)
+export interface CollectSettings {
+  categories: Category[];
+  num_rows: number;
+  updated_at: string;
+}
+
+// POST /api/collect 응답
+export interface CollectResult {
+  run_id: number;
+  status: "success" | "failed";
+  categories: Category[];
+  fetched_count: number;
+  inserted_count: number;
+}
+
 // GET·PUT /api/me/profile (계약서 3.3)
 export interface ProfileFields {
   company_name: string | null;
