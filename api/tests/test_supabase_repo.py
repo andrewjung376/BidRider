@@ -204,3 +204,24 @@ async def test_unsummarized_and_save_summary_requests() -> None:
     assert records[0].bid.raw == {"bidNtceNm": "x"} and records[0].summary is None
     assert post.url.path.endswith("/bid_summaries") and post.url.params["on_conflict"] == "bid_id"
     assert json.loads(post.content)["required_documents"] == []
+
+
+@pytest.mark.anyio
+async def test_page_beyond_last_returns_empty_list() -> None:
+    """PostgREST는 범위를 넘는 offset에 416(PGRST103)을 준다 → 오류가 아니라 빈 목록."""
+    repo = _repo(
+        lambda r: httpx.Response(
+            416,
+            json={"code": "PGRST103", "message": "Requested range not satisfiable"},
+            headers={"Content-Range": "*/10"},
+        )
+    )
+
+    assert await repo.list_bids(BidFilter(), page=5, size=20) == ([], 10)
+
+
+@pytest.mark.anyio
+async def test_416_on_other_requests_is_still_an_error() -> None:
+    repo = _repo(lambda r: httpx.Response(416, json={"code": "PGRST103"}))
+    with pytest.raises(RepositoryError, match="416"):
+        await repo.get_bid(1)
