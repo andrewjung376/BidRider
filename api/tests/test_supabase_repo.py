@@ -248,3 +248,33 @@ async def test_delete_user_error_raises() -> None:
     repo = _repo(lambda r: httpx.Response(403, json={"msg": "forbidden"}))
     with pytest.raises(RepositoryError, match="403"):
         await repo.delete_user("u-1")
+
+
+
+@pytest.mark.anyio
+async def test_recommendation_requests() -> None:
+    from app.repository import RecommendationRecord
+
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        if request.method == "GET":
+            return httpx.Response(200, json=[{"bid_id": 3, "score": 80, "reason": "r", "feedback": 1, "model": "m", "updated_at": "2026-10-19T00:00:00+00:00"}])
+        if request.method == "PATCH":
+            return httpx.Response(200, json=[] if "999" in str(request.url) else [{"bid_id": 3}])
+        return httpx.Response(201)
+
+    repo = _repo(handler)
+    recs = await repo.list_recommendations("u1")
+    await repo.save_recommendation("u1", RecommendationRecord(bid_id=3, score=70, reason="새 근거", model="m"))
+    ok = await repo.set_recommendation_feedback("u1", 3, -1)
+    missing = await repo.set_recommendation_feedback("u1", 999, 1)
+
+    assert recs[0].feedback == 1 and recs[0].updated_at.utcoffset() == KST.utcoffset(None)
+    get, post, patch, _ = calls
+    assert get.url.params["user_id"] == "eq.u1"
+    assert post.url.params["on_conflict"] == "user_id,bid_id"
+    assert "feedback" not in json.loads(post.content)  # 재평가해도 기존 👍/👎 유지
+    assert patch.url.params["bid_id"] == "eq.3" and json.loads(patch.content) == {"feedback": -1}
+    assert ok is True and missing is False

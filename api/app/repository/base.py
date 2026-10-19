@@ -56,6 +56,17 @@ class ProfileRecord:
     max_price: int | None
     keywords: list[str]
     consent_at: datetime
+    updated_at: datetime | None = None  # 추천 재평가 판단용 (저장소가 채움)
+
+
+@dataclass
+class RecommendationRecord:
+    bid_id: int
+    score: int
+    reason: str
+    model: str
+    feedback: int | None = None  # 1 = 👍, -1 = 👎
+    updated_at: datetime | None = None
 
 
 class RepositoryError(Exception):
@@ -108,6 +119,16 @@ class BidRepository(Protocol):
 
     async def add_feedback(self, user_id: str | None, rating: int, message: str, page: str | None) -> int:
         """저장한 피드백 id를 반환한다."""
+        ...
+
+    async def list_recommendations(self, user_id: str) -> list[RecommendationRecord]: ...
+
+    async def save_recommendation(self, user_id: str, record: RecommendationRecord) -> None:
+        """(user_id, bid_id) 기준으로 점수·근거를 저장한다. 기존 👍/👎는 유지한다."""
+        ...
+
+    async def set_recommendation_feedback(self, user_id: str, bid_id: int, feedback: int | None) -> bool:
+        """내 추천 목록에 없는 공고면 False."""
         ...
 
     async def delete_user(self, user_id: str) -> None:

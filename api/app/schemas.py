@@ -112,3 +112,52 @@ class FeedbackIn(BaseModel):
 
 class FeedbackOut(BaseModel):
     id: int
+
+
+# ---------------------------------------------------------------- D3: Agent 채팅 (계약서 3.4)
+class ChatTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+
+class ChatIn(BaseModel):
+    message: str = Field(min_length=1, max_length=1000)
+    history: list[ChatTurn] = Field(default=[], max_length=10)
+
+
+class ToolCallOut(BaseModel):
+    name: str
+    args: dict
+    result_count: int | None = None
+
+
+class ChatOut(BaseModel):
+    answer: str
+    bids: list[BidOut]
+    tool_calls: list[ToolCallOut]
+    ai_generated: bool = True
+    model: str
+
+
+# ---------------------------------------------------------------- D3: 적합도 추천 (계약서 3.4)
+class RecommendationOut(BaseModel):
+    bid: BidOut
+    score: int
+    reason: str
+    feedback: Literal[1, -1] | None = None
+    ai_generated: bool = True
+    model: str
+
+
+class RecommendationsOut(BaseModel):
+    items: list[RecommendationOut]
+    pending: int
+
+
+class RecommendationFeedbackIn(BaseModel):
+    feedback: Literal[1, -1] | None
+
+
+class RecommendationFeedbackOut(BaseModel):
+    bid_id: int
+    feedback: Literal[1, -1] | None

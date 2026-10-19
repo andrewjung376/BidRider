@@ -73,3 +73,48 @@ class FakeLLM:
             qualifications=" 지역제한 없음 ",
             required_documents=["입찰참가신청서", " "],
         )
+
+
+class FakeScorer:
+    """추천 평가용 가짜 LLM. 평가할 공고 부분에 들어 있는 단어로 점수를 정한다."""
+
+    provider = "fake"
+    model = "fake-scorer"
+
+    def __init__(self, scores: dict[str, int] | None = None, default: int = 50) -> None:
+        self.scores = scores or {}
+        self.default = default
+        self.prompts: list[str] = []
+
+    async def structured(self, *, system: str, prompt: str, output_type):
+        self.prompts.append(prompt)
+        target = prompt.split("[평가할 입찰공고]", 1)[-1]
+        score = next((s for word, s in self.scores.items() if word in target), self.default)
+        return output_type(score=score, reason=f"점수 {score} 근거")
+
+
+class FakeAgentLLM:
+    """정해진 도구 호출을 실행한 뒤 answer_fn(도구 결과 목록)으로 답하는 가짜 Agent LLM."""
+
+    provider = "fake"
+    model = "fake-agent"
+
+    def __init__(self, calls: list[tuple[str, dict]], answer_fn) -> None:
+        self.calls = calls
+        self.answer_fn = answer_fn
+        self.system = ""
+        self.messages: list[dict] = []
+
+    async def run_agent(self, *, system, messages, tools, execute, max_steps=3):
+        from app.llm.base import AgentResult, ToolCall
+
+        self.system, self.messages = system, messages
+        outputs, records = [], []
+        for name, args in self.calls:
+            try:
+                out, count = await execute(name, dict(args))
+            except Exception as exc:  # 실제 구현처럼 오류를 결과로 넘긴다
+                out, count = f"오류: {exc}", None
+            outputs.append(out)
+            records.append(ToolCall(name=name, args=args, result_count=count))
+        return AgentResult(text=self.answer_fn(outputs), tool_calls=records, model=self.model)

@@ -32,17 +32,22 @@ def get_repository(settings: Settings = Depends(get_settings)) -> BidRepository:
 
 
 @lru_cache
-def _fast_llm(provider: str, api_key: str, model: str) -> LLMProvider | None:
+def _llm(provider: str, api_key: str, model: str, agent: bool) -> LLMProvider | None:
     try:
-        return create_provider(provider, api_key=api_key, model=model)
+        return create_provider(provider, api_key=api_key, model=model, agent=agent)
     except LLMError as exc:
-        logger.warning("요약용 LLM을 쓸 수 없어 요약을 건너뜁니다: %s", exc)
+        logger.warning("LLM(%s)을 쓸 수 없어 해당 AI 기능을 건너뜁니다: %s", model, exc)
         return None
 
 
 def get_fast_llm(settings: Settings = Depends(get_settings)) -> LLMProvider | None:
-    """요약·추출용 LLM. 키가 없거나 제공자가 구현되지 않았으면 None (요약 생략)."""
-    return _fast_llm(settings.llm_provider, settings.anthropic_api_key, settings.llm_model_fast)
+    """요약·추천 평가용 빠른 모델. 키가 없거나 제공자가 구현되지 않았으면 None."""
+    return _llm(settings.llm_provider, settings.anthropic_api_key, settings.llm_model_fast, False)
+
+
+def get_agent_llm(settings: Settings = Depends(get_settings)) -> LLMProvider | None:
+    """Bid Agent(도구 호출)용 모델. 키가 없거나 제공자가 구현되지 않았으면 None."""
+    return _llm(settings.llm_provider, settings.anthropic_api_key, settings.llm_model_agent, True)
 
 
 def get_bid_source(settings: Settings = Depends(get_settings)) -> BidSource:
