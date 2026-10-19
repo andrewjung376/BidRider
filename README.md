@@ -7,7 +7,7 @@
 | **서비스** | **https://bidradar-web-mocha.vercel.app** |
 | api | https://bidradar-api.vercel.app (`/api/health`) |
 | 발표 자료 | [doc/presentation.pdf](doc/presentation.pdf) (원본: [presentation.md](doc/presentation.md), Marp 슬라이드 15장) |
-| 시연 영상 | 시연 순서: [doc/demo-script.md](doc/demo-script.md) / 영상 링크: (제출 시 기입) |
+| **시연 영상** | **https://youtu.be/ssP3JEbc05A** (시연 순서: [doc/demo-script.md](doc/demo-script.md)) |
 
 ## 프로젝트 소개
 ### 해결하려는 문제
