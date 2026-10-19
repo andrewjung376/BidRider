@@ -4,7 +4,14 @@ from datetime import datetime, time
 from typing import Literal
 
 from app.koneps.models import KST, Bid
-from app.repository.base import BidRecord, BidSummaryRecord, CollectRunRecord, ProfileRecord, SettingsRecord
+from app.repository.base import (
+    BidRecord,
+    BidSummaryRecord,
+    CollectRunRecord,
+    ProfileRecord,
+    RecommendationRecord,
+    SettingsRecord,
+)
 from app.schemas import BidFilter
 
 _MIN_DT = datetime.min.replace(tzinfo=KST)
@@ -18,6 +25,7 @@ class InMemoryBidRepository:
         self._runs: list[CollectRunRecord] = []
         self._profiles: dict[str, ProfileRecord] = {}
         self._feedbacks: list[dict] = []
+        self._recommendations: dict[tuple[str, int], RecommendationRecord] = {}
 
     async def upsert_bids(self, bids: list[Bid]) -> int:
         inserted = 0
@@ -96,8 +104,25 @@ class InMemoryBidRepository:
         return self._profiles.get(user_id)
 
     async def save_profile(self, profile: ProfileRecord) -> ProfileRecord:
+        profile.updated_at = datetime.now(KST)
         self._profiles[profile.user_id] = profile
         return profile
+
+    async def list_recommendations(self, user_id: str) -> list[RecommendationRecord]:
+        return [r for (uid, _), r in self._recommendations.items() if uid == user_id]
+
+    async def save_recommendation(self, user_id: str, record: RecommendationRecord) -> None:
+        existing = self._recommendations.get((user_id, record.bid_id))
+        record.feedback = existing.feedback if existing else None
+        record.updated_at = datetime.now(KST)
+        self._recommendations[(user_id, record.bid_id)] = record
+
+    async def set_recommendation_feedback(self, user_id: str, bid_id: int, feedback: int | None) -> bool:
+        record = self._recommendations.get((user_id, bid_id))
+        if record is None:
+            return False
+        record.feedback = feedback
+        return True
 
     async def add_feedback(self, user_id: str | None, rating: int, message: str, page: str | None) -> int:
         self._feedbacks.append({"user_id": user_id, "rating": rating, "message": message, "page": page})
@@ -106,6 +131,8 @@ class InMemoryBidRepository:
     async def delete_user(self, user_id: str) -> None:
         # Supabase의 외래키 동작(cascade / set null)을 그대로 흉내 낸다
         self._profiles.pop(user_id, None)
+        for key in [k for k in self._recommendations if k[0] == user_id]:
+            del self._recommendations[key]
         for feedback in self._feedbacks:
             if feedback["user_id"] == user_id:
                 feedback["user_id"] = None

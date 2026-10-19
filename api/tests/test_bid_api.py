@@ -1,16 +1,19 @@
 """API 계약(doc/data-contract.md 3장) 검증. 인증·수집 소스·저장소는 가짜로 바꿔 끼운다."""
 
+import asyncio
 from collections.abc import Iterator
+from datetime import datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.auth import CurrentUser, get_current_user
 from app.config import Settings, get_settings
-from app.deps import get_bid_source, get_fast_llm, get_repository
+from app.deps import get_agent_llm, get_bid_source, get_fast_llm, get_repository
+from app.koneps.models import KST
 from app.main import app
 from app.repository import InMemoryBidRepository
-from tests.fakes import FakeLLM, FakeSource, make_bid
+from tests.fakes import FakeAgentLLM, FakeLLM, FakeScorer, FakeSource, make_bid
 
 CRON_SECRET = "test-cron-secret"
 
@@ -215,3 +218,55 @@ def test_delete_me_requires_login(repo: InMemoryBidRepository) -> None:
         assert TestClient(app).delete("/api/me").status_code == 401
     finally:
         app.dependency_overrides.clear()
+
+
+
+# ---------------------------------------------------------------- D3 API (계약서 3.4)
+def test_ai_endpoints_require_login(repo: InMemoryBidRepository) -> None:
+    app.dependency_overrides[get_repository] = lambda: repo
+    app.dependency_overrides[get_settings] = lambda: Settings(_env_file=None)
+    try:
+        c = TestClient(app)
+        assert c.post("/api/agent/chat", json={"message": "공고"}).status_code == 401
+        assert c.get("/api/recommendations").status_code == 401
+        assert c.post("/api/recommendations/1/feedback", json={"feedback": 1}).status_code == 401
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_agent_chat_endpoint(client: TestClient) -> None:
+    client.post("/api/collect", json={"categories": ["용역"]})
+    app.dependency_overrides[get_agent_llm] = lambda: FakeAgentLLM(
+        [("search_bids", {"q": "공고 1"})], lambda outputs: "공고 1 (R26BK00000001-000) 입니다."
+    )
+
+    body = client.post("/api/agent/chat", json={"message": "공고 1 찾아줘", "history": []}).json()
+
+    assert body["answer"].startswith("공고 1") and body["ai_generated"] is True and body["model"] == "fake-agent"
+    assert [b["bid_ntce_no"] for b in body["bids"]] == ["R26BK00000001"]
+    assert body["tool_calls"][0]["name"] == "search_bids"
+    assert client.post("/api/agent/chat", json={"message": ""}).status_code == 422
+    too_long = [{"role": "user", "content": "x"}] * 11
+    assert client.post("/api/agent/chat", json={"message": "a", "history": too_long}).status_code == 422
+    app.dependency_overrides[get_agent_llm] = lambda: None
+    assert client.post("/api/agent/chat", json={"message": "a"}).status_code == 503
+
+
+def test_recommendations_endpoints(client: TestClient, repo: InMemoryBidRepository) -> None:
+    app.dependency_overrides[get_fast_llm] = lambda: FakeScorer({"공고 2": 90})
+    assert client.get("/api/recommendations").status_code == 404  # 프로필 없음
+    client.put("/api/me/profile", json={"industries": ["SW"], "consent": True})
+    future = datetime.now(KST) + timedelta(days=30)
+    asyncio.run(repo.upsert_bids([make_bid(i, closing=future) for i in range(1, 4)]))
+
+    body = client.get("/api/recommendations", params={"limit": 2}).json()
+
+    assert body["pending"] == 0 and len(body["items"]) == 2
+    top = body["items"][0]
+    assert top["bid"]["bid_ntce_nm"] == "공고 2" and top["score"] == 90 and top["ai_generated"] is True
+    bid_id = top["bid"]["id"]
+    assert client.post(f"/api/recommendations/{bid_id}/feedback", json={"feedback": 1}).json() == {"bid_id": bid_id, "feedback": 1}
+    assert client.post(f"/api/recommendations/{bid_id}/feedback", json={"feedback": None}).json()["feedback"] is None
+    assert client.post(f"/api/recommendations/{bid_id}/feedback", json={"feedback": 2}).status_code == 422
+    assert client.post("/api/recommendations/9999/feedback", json={"feedback": 1}).status_code == 404
+    assert client.get("/api/recommendations", params={"limit": 21}).status_code == 422

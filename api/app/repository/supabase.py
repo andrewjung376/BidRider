@@ -15,6 +15,7 @@ from app.repository.base import (
     BidSummaryRecord,
     CollectRunRecord,
     ProfileRecord,
+    RecommendationRecord,
     RepositoryError,
     SettingsRecord,
 )
@@ -214,6 +215,50 @@ class SupabaseBidRepository:
         )
         return rows[0]["id"]
 
+    async def list_recommendations(self, user_id: str) -> list[RecommendationRecord]:
+        rows = await self._request(
+            "GET",
+            "/recommendations",
+            params={"select": "bid_id,score,reason,feedback,model,updated_at", "user_id": f"eq.{user_id}"},
+        )
+        return [
+            RecommendationRecord(
+                bid_id=r["bid_id"],
+                score=r["score"],
+                reason=r["reason"],
+                model=r["model"],
+                feedback=r.get("feedback"),
+                updated_at=_dt(r.get("updated_at")),
+            )
+            for r in rows
+        ]
+
+    async def save_recommendation(self, user_id: str, record: RecommendationRecord) -> None:
+        # feedback 컬럼은 보내지 않아 기존 👍/👎가 유지된다. updated_at은 트리거가 갱신한다.
+        await self._request(
+            "POST",
+            "/recommendations",
+            params={"on_conflict": "user_id,bid_id"},
+            json={
+                "user_id": user_id,
+                "bid_id": record.bid_id,
+                "score": record.score,
+                "reason": record.reason,
+                "model": record.model,
+            },
+            prefer="resolution=merge-duplicates,return=minimal",
+        )
+
+    async def set_recommendation_feedback(self, user_id: str, bid_id: int, feedback: int | None) -> bool:
+        rows = await self._request(
+            "PATCH",
+            "/recommendations",
+            params={"user_id": f"eq.{user_id}", "bid_id": f"eq.{bid_id}"},
+            json={"feedback": feedback},
+            prefer="return=representation",
+        )
+        return bool(rows)
+
     async def delete_user(self, user_id: str) -> None:
         # Auth 계정을 지우면 DB 외래키가 profiles·recommendations는 삭제, 나머지 연결은 null로 정리한다.
         try:
@@ -315,6 +360,7 @@ def _profile_record(row: dict[str, Any]) -> ProfileRecord:
         max_price=row.get("max_price"),
         keywords=row.get("keywords") or [],
         consent_at=_dt(row["consent_at"]),
+        updated_at=_dt(row.get("updated_at")),
     )
 
 

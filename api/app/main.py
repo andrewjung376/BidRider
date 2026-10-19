@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from app.repository import RepositoryError
+from app.routes.ai import router as ai_router
 from app.routes.bids import router as bids_router
 from app.routes.me import router as me_router
 
@@ -14,6 +15,7 @@ logger = logging.getLogger("bidradar")
 app = FastAPI(title="BidRadar API", version="0.1.0")
 app.include_router(bids_router)
 app.include_router(me_router)
+app.include_router(ai_router)
 
 
 @app.exception_handler(RepositoryError)

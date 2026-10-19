@@ -4,6 +4,7 @@ from app.repository.base import (
     BidSummaryRecord,
     CollectRunRecord,
     ProfileRecord,
+    RecommendationRecord,
     RepositoryError,
     SettingsRecord,
 )
@@ -17,6 +18,7 @@ __all__ = [
     "CollectRunRecord",
     "InMemoryBidRepository",
     "ProfileRecord",
+    "RecommendationRecord",
     "RepositoryError",
     "SettingsRecord",
     "SupabaseBidRepository",
