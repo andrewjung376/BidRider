@@ -184,3 +184,34 @@ def test_collect_succeeds_even_if_summary_fails(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json()["inserted_count"] == 3
     assert all(item["summary"] is None for item in client.get("/api/bids").json()["items"])
+
+
+def test_delete_me_removes_profile_and_unlinks_records(client: TestClient, repo: InMemoryBidRepository) -> None:
+    client.put("/api/me/profile", json={"industries": ["SW"], "consent": True})
+    client.post("/api/feedback", json={"rating": 5, "message": "좋아요"})
+    client.put("/api/settings", json={"categories": ["용역"], "num_rows": 10})
+    client.post("/api/collect")
+    # 로그인 사용자의 피드백이 연결되도록 토큰 있는 상태로 한 번 더 제출 (의존성 덮어쓰기로 user-1)
+    from app.auth import get_optional_user
+    app.dependency_overrides[get_optional_user] = lambda: CurrentUser(id="user-1")
+    client.post("/api/feedback", json={"rating": 4, "message": "로그인 의견"})
+
+    response = client.delete("/api/me")
+
+    assert response.status_code == 204 and response.content == b""
+    assert client.get("/api/me/profile").status_code == 404
+    assert all(f["user_id"] is None for f in repo.feedbacks) and len(repo.feedbacks) == 2  # 내용은 남고 연결만 해제
+    assert all(r.requested_by is None for r in repo.runs)
+    assert client.get("/api/settings").status_code == 200
+    assert repo._settings.updated_by is None
+    # 이미 지운 계정을 다시 지워도 204
+    assert client.delete("/api/me").status_code == 204
+
+
+def test_delete_me_requires_login(repo: InMemoryBidRepository) -> None:
+    app.dependency_overrides[get_repository] = lambda: repo
+    app.dependency_overrides[get_settings] = lambda: Settings(_env_file=None)
+    try:
+        assert TestClient(app).delete("/api/me").status_code == 401
+    finally:
+        app.dependency_overrides.clear()

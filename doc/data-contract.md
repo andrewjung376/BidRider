@@ -5,7 +5,7 @@
 - **API**: 팀장이 이 문서대로 FastAPI 엔드포인트를 구현하고, 팀원은 이 응답 형식에 맞춰 UI를 만든다. API가 준비되기 전에는 아래 응답 예시를 가짜 데이터로 쓴다.
 - **변경 절차**: 계약을 바꿀 때는 이 문서를 고치는 PR을 먼저 올리고, 상대 역할의 리뷰를 받은 뒤 병합한다.
 
-버전: v1 (2026-10-16)
+버전: v1.1 (2026-10-19) — `DELETE /api/me` 추가 (#21, NFR-05)
 
 ---
 
@@ -185,6 +185,7 @@
 | `PUT /api/settings` | 필요 | 수집 설정 변경 (FR-14) |
 | `GET /api/me/profile` | 필요 | 내 프로필 조회 (FR-05) |
 | `PUT /api/me/profile` | 필요 | 내 프로필 저장 (FR-05) |
+| `DELETE /api/me` | 필요 | 탈퇴: 계정과 개인 데이터 삭제 (NFR-05) |
 | `POST /api/feedback` | 선택 | 피드백 제출 (FR-11) |
 | `GET /api/cron/collect` | `CRON_SECRET` | Vercel Cron 전용, web에서 호출하지 않음 |
 
@@ -251,6 +252,19 @@
 { "rating": 4, "message": "목록이 보기 편해요", "page": "/bids" }
 ```
 응답: `201` `{ "id": 7 }`
+
+#### `DELETE /api/me`
+요청 본문 없음. 응답: **`204`** (본문 없음)
+- 로그인한 사용자의 **Supabase Auth 계정을 삭제**한다. DB 외래키에 따라 함께 처리된다 (2장).
+
+| 테이블 | 처리 |
+|---|---|
+| `profiles`, `recommendations` | 삭제 (`on delete cascade`) |
+| `feedbacks.user_id`, `collect_runs.requested_by`, `collect_settings.updated_by` | `null`로 연결 해제 (`on delete set null`). 피드백 내용과 수집 기록은 익명으로 남는다 |
+
+- 이미 삭제된 계정이면(인증 서버 404) 그대로 `204`를 돌려준다.
+- 성공 후 web은 `supabase.auth.signOut()`으로 브라우저 세션을 정리한다. 삭제된 계정의 기존 토큰은 다음 api 호출부터 401이다.
+- 되돌릴 수 없으므로 UI는 삭제 전 확인 단계를 둔다.
 
 ### 3.4 D3 예정 (형식은 D2 종료 시 확정)
 | 메서드·경로 | 설명 |

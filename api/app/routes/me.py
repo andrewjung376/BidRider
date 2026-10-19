@@ -1,6 +1,6 @@
 """프로필·피드백 API (doc/data-contract.md 3.3)."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from app.auth import CurrentUser, get_current_user, get_optional_user
 from app.deps import get_repository
@@ -35,6 +35,15 @@ async def put_profile(
         return await service.save_profile(repo, user.id, body)
     except ConsentRequired as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from None
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_me(
+    user: CurrentUser = Depends(get_current_user),
+    repo: BidRepository = Depends(get_repository),
+) -> Response:
+    await service.delete_account(repo, user.id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/feedback", response_model=FeedbackOut, status_code=status.HTTP_201_CREATED)

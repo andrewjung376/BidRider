@@ -103,6 +103,18 @@ class InMemoryBidRepository:
         self._feedbacks.append({"user_id": user_id, "rating": rating, "message": message, "page": page})
         return len(self._feedbacks)
 
+    async def delete_user(self, user_id: str) -> None:
+        # Supabase의 외래키 동작(cascade / set null)을 그대로 흉내 낸다
+        self._profiles.pop(user_id, None)
+        for feedback in self._feedbacks:
+            if feedback["user_id"] == user_id:
+                feedback["user_id"] = None
+        for run in self._runs:
+            if run.requested_by == user_id:
+                run.requested_by = None
+        if self._settings.updated_by == user_id:
+            self._settings.updated_by = None
+
     @property
     def runs(self) -> list[CollectRunRecord]:
         return self._runs
