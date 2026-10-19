@@ -35,6 +35,11 @@ async def add_feedback(
     return FeedbackOut(id=await repo.add_feedback(user_id, rating, message.strip(), page))
 
 
+async def delete_account(repo: BidRepository, user_id: str) -> None:
+    """탈퇴 (NFR-05): 계정과 개인 데이터를 삭제한다."""
+    await repo.delete_user(user_id)
+
+
 def _to_out(record: ProfileRecord) -> ProfileOut:
     return ProfileOut(
         company_name=record.company_name,

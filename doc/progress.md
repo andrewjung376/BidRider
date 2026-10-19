@@ -122,3 +122,13 @@
 - D3(10/19): 채팅 UI(FR-07), AI 배지, 추천 👍/👎(FR-08), 1차 배포 확인
 - 테스터 모집 시작(`doc/user-test.md` 안내문), 10/19까지 5명 이상 확정
 - 사용자 요청 필요: Vercel 프로젝트 2개 생성·배포, Vercel `web` 환경 변수(`NEXT_PUBLIC_SUPABASE_*`, `API_BASE_URL`) 후 재배포, Supabase Site URL·Redirect URLs에 Production URL 추가, Google OAuth 앱 게시
+
+## D3 — 2026-10-19 (월)
+
+### 팀장
+- #21 탈퇴·데이터 삭제 API (NFR-05, `feature/delete-me`)
+  - 계약서 v1.1: `DELETE /api/me` → 204
+  - 결정: **Supabase Auth 계정 삭제 한 번으로 처리**. 마이그레이션의 외래키가 `profiles`·`recommendations`는 삭제(cascade), `feedbacks`·`collect_runs`·`collect_settings`의 사용자 연결은 `null`(set null)로 정리하므로 테이블별 삭제 코드가 필요 없고 누락 위험도 없음
+  - 이미 삭제된 계정(인증 서버 404)도 204 (반복 호출 안전)
+  - 확인: 존재하지 않는 계정 ID로 실제 관리자 삭제 호출 → 인증 통과·404 처리, 기존 데이터 변화 없음. 실제 계정 삭제는 하지 않음
+  - 테스트 54건 통과(실호출 2건 skip)

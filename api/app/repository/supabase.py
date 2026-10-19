@@ -37,6 +37,7 @@ class SupabaseBidRepository:
         timeout: float = 15.0,
     ) -> None:
         self._base = f"{url.rstrip('/')}/rest/v1"
+        self._auth_admin = f"{url.rstrip('/')}/auth/v1/admin"
         self._headers = {"apikey": service_key}
         if not service_key.startswith("sb_"):  # 기존 방식(JWT) service_role 키
             self._headers["Authorization"] = f"Bearer {service_key}"
@@ -212,6 +213,18 @@ class SupabaseBidRepository:
             prefer="return=representation",
         )
         return rows[0]["id"]
+
+    async def delete_user(self, user_id: str) -> None:
+        # Auth 계정을 지우면 DB 외래키가 profiles·recommendations는 삭제, 나머지 연결은 null로 정리한다.
+        try:
+            async with httpx.AsyncClient(transport=self._transport, timeout=self._timeout) as client:
+                response = await client.delete(f"{self._auth_admin}/users/{user_id}", headers=self._headers)
+        except httpx.HTTPError as exc:
+            raise RepositoryError(f"Supabase Auth 계정 삭제 연결 실패: {type(exc).__name__}") from None
+        if response.status_code == 404:  # 이미 삭제된 계정
+            return
+        if response.status_code >= 400:
+            raise RepositoryError(f"Supabase Auth 계정 삭제 오류 {response.status_code}: {response.text[:300]}")
 
     # ---------------------------------------------------------------- HTTP
     async def _request(self, method: str, path: str, **kwargs: Any) -> Any:

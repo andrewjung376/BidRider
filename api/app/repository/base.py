@@ -109,3 +109,8 @@ class BidRepository(Protocol):
     async def add_feedback(self, user_id: str | None, rating: int, message: str, page: str | None) -> int:
         """저장한 피드백 id를 반환한다."""
         ...
+
+    async def delete_user(self, user_id: str) -> None:
+        """사용자 계정을 삭제한다. 프로필·추천은 삭제, 피드백·수집 기록·설정의 사용자 연결은 해제 (NFR-05).
+        이미 없는 계정이어도 오류로 보지 않는다."""
+        ...

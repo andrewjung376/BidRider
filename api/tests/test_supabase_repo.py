@@ -225,3 +225,26 @@ async def test_416_on_other_requests_is_still_an_error() -> None:
     repo = _repo(lambda r: httpx.Response(416, json={"code": "PGRST103"}))
     with pytest.raises(RepositoryError, match="416"):
         await repo.get_bid(1)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("status", [200, 404])
+async def test_delete_user_calls_auth_admin(status: int) -> None:
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(status, json={})
+
+    await _repo(handler, key="sb_secret_x").delete_user("u-1")  # 404(이미 삭제)도 오류 아님
+
+    assert calls[0].method == "DELETE"
+    assert str(calls[0].url) == "https://example.supabase.co/auth/v1/admin/users/u-1"
+    assert calls[0].headers["apikey"] == "sb_secret_x"
+
+
+@pytest.mark.anyio
+async def test_delete_user_error_raises() -> None:
+    repo = _repo(lambda r: httpx.Response(403, json={"msg": "forbidden"}))
+    with pytest.raises(RepositoryError, match="403"):
+        await repo.delete_user("u-1")
