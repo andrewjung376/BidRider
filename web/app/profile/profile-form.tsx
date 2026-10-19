@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import TagInput from "@/components/tag-input";
@@ -257,6 +258,15 @@ export default function ProfileForm() {
           }`}
         >
           {notice.text}
+          {notice.kind === "success" && (
+            // 사용자 테스트: 프로필 저장 후 추천 화면으로 돌아오지 않은 테스터가 있었음
+            <>
+              {" "}
+              <Link href="/recommendations" className="font-medium underline underline-offset-4">
+                맞춤 추천 보기 →
+              </Link>
+            </>
+          )}
         </p>
       )}
 
