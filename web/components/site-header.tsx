@@ -11,13 +11,19 @@ export default function SiteHeader() {
         <Link href="/" className="text-lg font-bold tracking-tight">
           BidRadar
         </Link>
-        <Link href="/bids" className={navLink}>
-          입찰공고
-        </Link>
-        <Link href="/settings" className={navLink}>
-          수집 설정
-        </Link>
-        <div className="ml-auto flex items-center gap-3 sm:gap-6">
+        {/* 휴대폰 폭에서 메뉴가 넘치면 이 영역만 가로로 밀어서 본다 */}
+        <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto [scrollbar-width:none] sm:gap-6">
+          <Link href="/bids" className={navLink}>
+            입찰공고
+          </Link>
+          <Link href="/chat" className={navLink}>
+            AI 검색
+          </Link>
+          <Link href="/settings" className={navLink}>
+            수집 설정
+          </Link>
+        </div>
+        <div className="flex shrink-0 items-center gap-3 sm:gap-6">
           {/* 휴대폰 폭에서는 하단(footer)의 의견 보내기 링크를 쓴다 */}
           <FeedbackLink className={`${navLink} hidden sm:inline`}>의견 보내기</FeedbackLink>
           <AuthButton />
