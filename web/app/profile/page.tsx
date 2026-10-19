@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import DeleteAccount from "./delete-account";
 import ProfileForm from "./profile-form";
 
 export const metadata: Metadata = { title: "회사 프로필" };
@@ -11,6 +12,7 @@ export default function ProfilePage() {
         업종·지역·금액 범위·관심 키워드를 저장하면 회사에 맞는 공고를 추천하는 데 씁니다.
       </p>
       <ProfileForm />
+      <DeleteAccount />
     </main>
   );
 }

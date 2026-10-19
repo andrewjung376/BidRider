@@ -234,7 +234,10 @@ export default function ProfileForm() {
             <dt className="text-zinc-500">이용 목적</dt>
             <dd>회사에 맞는 입찰공고 추천과 적합도 판단, 서비스 개선</dd>
             <dt className="text-zinc-500">보유 기간</dt>
-            <dd>삭제를 요청하거나 과제 운영이 끝날 때까지. 삭제 요청은 &quot;의견 보내기&quot;로 남겨 주세요.</dd>
+            <dd>
+              탈퇴할 때까지(또는 과제 운영 종료 시). 이 화면 아래 &quot;탈퇴(계정 삭제)&quot;로 언제든 계정과 프로필을 삭제할
+              수 있으며, 남기신 의견(피드백) 내용은 작성자 정보 없이 익명으로 남습니다.
+            </dd>
           </dl>
           <p className="text-xs text-zinc-500">동의하지 않으면 프로필을 저장할 수 없습니다. 공고 조회는 동의 없이도 쓸 수 있습니다.</p>
           <label className="flex items-center gap-2 font-medium">
