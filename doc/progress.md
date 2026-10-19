@@ -132,3 +132,13 @@
   - 이미 삭제된 계정(인증 서버 404)도 204 (반복 호출 안전)
   - 확인: 존재하지 않는 계정 ID로 실제 관리자 삭제 호출 → 인증 통과·404 처리, 기존 데이터 변화 없음. 실제 계정 삭제는 하지 않음
   - 테스트 54건 통과(실호출 2건 skip)
+- 계약서 v1.2 (D3 API: Agent 채팅·적합도 추천·👍/👎) PR #26 — 팀원 리뷰 대기
+- **1차 배포 (Vercel)**
+  - 프로젝트: `bidradar-api`(FastAPI, 루트 `api`), `bidradar-web`(Next.js, 루트 `web`), 둘 다 GitHub `main` 연결(병합 시 자동 배포), 함수 리전 `icn1`
+  - 주소: 서비스 **https://bidradar-web-mocha.vercel.app** (`bidradar-web` 이름이 이미 사용 중이라 `-mocha`가 붙음), api https://bidradar-api.vercel.app
+  - 생성 과정: Vercel 커넥터는 프로젝트 생성 권한이 없어(403) 실패 → 사용자가 Vercel CLI 로그인과 **Vercel GitHub App 설치(BidRider만 허용)** → 팀장이 CLI(`vercel api`)로 프로젝트 생성·배포
+  - 환경 변수: 비밀이 아닌 값(모델명, Supabase URL, publishable 키, `API_BASE_URL`)은 팀장이 등록, **비밀 값 4개(`DATA_GO_KR_SERVICE_KEY`, `ANTHROPIC_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`)는 사용자가 Sensitive로 직접 입력**. 배포용 Anthropic 키와 Supabase secret 키는 로컬과 분리해 새로 발급
+  - 확인: 배포 리전 `icn1`, Cron `/api/cron/collect` 매일 09:00 KST 등록, api·web 모든 화면 200, 프록시 정상, 인증 보호(토큰 없음 401, Cron 비밀 없음 401), 응답 0.1~1.6초
+  - **Cron 수동 실행(사용자가 Vercel에서 Run)**: 10건 수집 3초 + 새 공고 10건 Claude 요약 약 8초 → **Vercel 서울 리전에서 공공데이터포털 정상 호출(해외 IP 차단 위험 해소)**, `bids` 17 → 27건
+  - Production Google 로그인: 사용자가 Supabase Site URL·Redirect URLs 설정 후 확인
+  - 참고: Preview 환경에는 비밀 변수 일부가 없음 (테스터는 Production만 사용)
