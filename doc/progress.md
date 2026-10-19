@@ -142,3 +142,8 @@
   - **Cron 수동 실행(사용자가 Vercel에서 Run)**: 10건 수집 3초 + 새 공고 10건 Claude 요약 약 8초 → **Vercel 서울 리전에서 공공데이터포털 정상 호출(해외 IP 차단 위험 해소)**, `bids` 17 → 27건
   - Production Google 로그인: 사용자가 Supabase Site URL·Redirect URLs 설정 후 확인
   - 참고: Preview 환경에는 비밀 변수 일부가 없음 (테스터는 Production만 사용)
+- **Agent·추천 구현** (`feature/agent-recommend`, 계약서 v1.2 PR #26 기준)
+  - `POST /api/agent/chat` (FR-07·09): Claude Sonnet 5.5 도구 호출 루프(최대 3단계, 마지막 단계는 도구 없이 답변), 도구 `search_bids`·`get_bid_detail`은 기존 서비스 함수 재사용(PRD 5.2), 오늘 날짜(요일)·로그인 사용자 프로필을 시스템 프롬프트에 넣음, 답변이 공고번호로 언급한 공고만 `bids`로 반환. 거절(refusal) 시 서버 측 대체 모델(`fallbacks: "default"`) 사용
+  - `GET /api/recommendations` (FR-06): 마감 전 최신 공고 30건 후보, Claude Haiku 5.5로 점수·근거 평가(동시 5건, 한 번에 10건, 25초 제한) → `recommendations` 저장, 새 공고·프로필 변경 후 공고만 재평가, 남은 후보는 `pending`
+  - `POST /api/recommendations/{bid_id}/feedback` (FR-08): 👍/👎 저장, 재평가해도 유지, 다음 평가 프롬프트에 👍·👎 공고명을 넣음 (Long-term Memory)
+  - 테스트 68건 통과(실호출 2건 skip). 실제 Claude 확인: Agent "이번 주 마감 설계 용역" → `closing_from/to`를 이번 주(10/19~10/25)로 계산해 5건 인용(9.4초), "1억 이하 서울·경기" → 기관별 2회 검색(6.6초) / 추천 10건 평가 5.2초 (실제 공고를 메모리 저장소에 복사해 평가, 실제 계정 데이터에는 쓰지 않음)
