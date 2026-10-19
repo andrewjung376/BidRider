@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { fetchBids, PAGE_SIZE, parseBidQuery, toSearchParams } from "@/lib/api";
 import type { BidQuery } from "@/lib/types";
-import BidCard from "./bid-card";
+import BidCard from "@/components/bid-card";
 import BidFilters from "./bid-filters";
 import Pagination from "./pagination";
 

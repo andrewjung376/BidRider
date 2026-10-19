@@ -77,6 +77,43 @@ export interface ProfileInput extends ProfileFields {
   consent: boolean;
 }
 
+// POST /api/agent/chat (계약서 3.4)
+export interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ToolCall {
+  name: string;
+  args: Record<string, unknown>;
+  result_count: number | null;
+}
+
+export interface ChatResponse {
+  answer: string;
+  bids: Bid[];
+  tool_calls: ToolCall[];
+  ai_generated: boolean;
+  model: string;
+}
+
+// GET /api/recommendations, POST /api/recommendations/{bid_id}/feedback (계약서 3.4)
+export type FeedbackValue = 1 | -1 | null;
+
+export interface Recommendation {
+  bid: Bid;
+  score: number;
+  reason: string;
+  feedback: FeedbackValue;
+  ai_generated: boolean;
+  model: string;
+}
+
+export interface RecommendationList {
+  items: Recommendation[];
+  pending: number;
+}
+
 // GET /api/bids 쿼리 파라미터 (모두 선택)
 export interface BidQuery {
   category?: Category;
