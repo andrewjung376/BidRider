@@ -1,9 +1,15 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import AccountNotice from "./account-notice";
 import ApiStatus from "./api-status";
 
 export default function Home() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-16 sm:px-6">
+      {/* useSearchParams를 쓰는 부분만 요청 시점에 그린다 (홈은 정적 페이지 유지) */}
+      <Suspense fallback={null}>
+        <AccountNotice />
+      </Suspense>
       <h1 className="text-3xl font-bold tracking-tight">BidRadar 입찰레이더</h1>
       <p className="text-zinc-600 dark:text-zinc-400">
         나라장터 최신 입찰공고를 수집해 AI가 요약하고, 회사 프로필에 맞는 공고를 추천합니다.
