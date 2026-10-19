@@ -5,7 +5,9 @@
 - **API**: 팀장이 이 문서대로 FastAPI 엔드포인트를 구현하고, 팀원은 이 응답 형식에 맞춰 UI를 만든다. API가 준비되기 전에는 아래 응답 예시를 가짜 데이터로 쓴다.
 - **변경 절차**: 계약을 바꿀 때는 이 문서를 고치는 PR을 먼저 올리고, 상대 역할의 리뷰를 받은 뒤 병합한다.
 
-버전: v1.1 (2026-10-19) — `DELETE /api/me` 추가 (#21, NFR-05)
+버전: v1.2 (2026-10-19) — D3 API 확정: Agent 채팅, 적합도 추천, 👍/👎 (3.4)
+
+이전: v1.1 `DELETE /api/me` 추가 (#21) / v1 최초 작성
 
 ---
 
@@ -266,12 +268,92 @@
 - 성공 후 web은 `supabase.auth.signOut()`으로 브라우저 세션을 정리한다. 삭제된 계정의 기존 토큰은 다음 api 호출부터 401이다.
 - 되돌릴 수 없으므로 UI는 삭제 전 확인 단계를 둔다.
 
-### 3.4 D3 예정 (형식은 D2 종료 시 확정)
-| 메서드·경로 | 설명 |
-|---|---|
-| `POST /api/agent/chat` | 자연어 검색 Agent (FR-07). 요청 `{ "message": "...", "history": [...] }`, 응답에 답변과 인용 공고 목록 |
-| `GET /api/recommendations` | 내 프로필 기준 추천 목록 (FR-06) |
-| `POST /api/recommendations/{bid_id}/feedback` | 👍/👎 (FR-08), 요청 `{ "feedback": 1 }` |
+### 3.4 D3 API (Agent·추천)
+| 메서드·경로 | 인증 | 설명 |
+|---|---|---|
+| `POST /api/agent/chat` | 필요 | 자연어 검색 Agent (FR-07, RAG FR-09) |
+| `GET /api/recommendations` | 필요 | 내 프로필 기준 적합도 추천 (FR-06) |
+| `POST /api/recommendations/{bid_id}/feedback` | 필요 | 추천 👍/👎 (FR-08) |
+
+- 세 API 모두 LLM을 호출하므로 비용·남용 방지를 위해 **로그인이 필요**하다.
+- LLM 호출이 포함되어 응답이 **최대 약 30초** 걸릴 수 있다. UI는 진행 중 표시를 하고, 요청 제한 시간은 **60초 이상**으로 둔다.
+- 응답의 AI 생성 내용(`answer`, `reason`)에는 `ai_generated: true`가 붙는다. UI는 "AI 생성" 배지와 함께 표시하고, 공고는 원문 링크를 함께 보여 준다 (NFR-04).
+
+#### `POST /api/agent/chat`
+대화 기록은 서버에 저장하지 않는다. web이 이전 대화를 `history`로 함께 보낸다.
+
+요청
+```json
+{
+  "message": "서울 SW 개발 1억 이하, 이번 주 마감 공고 찾아줘",
+  "history": [
+    { "role": "user", "content": "GIS 관련 공고 있어?" },
+    { "role": "assistant", "content": "최근 공고 중 GIS 관련 공고는 2건입니다. ..." }
+  ]
+}
+```
+- `message`: 1~1000자
+- `history`: 최대 10개 (오래된 것부터 잘라서 보낸다). `role`은 `user` 또는 `assistant`, `content`는 1~4000자
+
+응답 `200`
+```json
+{
+  "answer": "조건에 맞는 공고는 2건입니다.
+1. 서창1분구 하수관로 정비사업 GIS DB 구축 용역 (R26BK01774288-000) — 마감 10/27
+2. ...",
+  "bids": [Bid],
+  "tool_calls": [
+    { "name": "search_bids", "args": { "category": "용역", "q": "SW", "max_price": 100000000, "closing_to": "2026-10-25" }, "result_count": 2 }
+  ],
+  "ai_generated": true,
+  "model": "claude-sonnet-5-5"
+}
+```
+- `answer`: 줄바꿈이 있는 일반 텍스트 (마크다운 아님). 공고를 언급할 때 `공고번호-차수`를 함께 적는다.
+- `bids`: 답변이 근거로 쓴 공고 (최대 10건, 언급 순서). `Bid` 형식은 3.2와 같다. UI는 답변 아래에 공고 카드로 보여 주고 `/bids/{id}`로 연결한다.
+- `tool_calls`: Agent가 실행한 도구와 인자 (발표·디버깅용, UI 표시는 선택). 도구는 `search_bids`(3.3 `GET /api/bids`와 같은 필터), `get_bid_detail`.
+- 로그인 사용자의 **회사 프로필이 있으면 답변에 반영**한다 (Long-term Memory). 프로필이 없어도 동작한다.
+- 오류: `401` 로그인 필요, `422` 입력값 오류, `502` LLM 호출 실패 (`detail`에 사유)
+
+#### `GET /api/recommendations`
+내 프로필로 **아직 마감되지 않은 최신 공고**의 적합도를 평가해 점수순으로 돌려준다.
+
+쿼리 파라미터: `limit` (기본 10, 최대 20)
+
+응답 `200`
+```json
+{
+  "items": [
+    {
+      "bid": Bid,
+      "score": 87,
+      "reason": "관심 업종(소프트웨어 개발)과 지역(서울)이 일치하고, 추정가격이 관심 금액 범위 안이다.",
+      "feedback": null,
+      "ai_generated": true,
+      "model": "claude-haiku-5-5"
+    }
+  ],
+  "pending": 3
+}
+```
+- 정렬: `score` 내림차순, 같으면 공고게시일시 최신순
+- 평가 결과는 `recommendations`에 저장해 두고 다시 계산하지 않는다. **새 공고와, 프로필을 바꾼 뒤의 공고만** 새로 평가한다.
+- 한 번 요청에서 새로 평가하는 공고 수와 시간에는 제한이 있다. 아직 평가하지 못한 후보 수가 `pending`이다. `pending > 0`이면 UI는 "더 불러오기"(같은 요청 다시 호출)를 보여 줄 수 있다.
+- 👍/👎 이력은 **다음 평가에 반영**한다 (Long-term Memory). 이미 매긴 점수는 바뀌지 않는다.
+- 오류: `401` 로그인 필요, **`404` 프로필 없음** (UI는 프로필 작성으로 안내), `502` LLM 호출 실패
+
+#### `POST /api/recommendations/{bid_id}/feedback`
+요청
+```json
+{ "feedback": 1 }
+```
+- `1` = 👍, `-1` = 👎, `null` = 취소
+
+응답 `200`
+```json
+{ "bid_id": 123, "feedback": 1 }
+```
+- 오류: `401` 로그인 필요, `404` 내 추천 목록에 없는 공고, `422` 값 오류
 
 ---
 
