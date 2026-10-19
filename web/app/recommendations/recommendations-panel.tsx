@@ -45,27 +45,34 @@ function FeedbackButtons({
   busy: boolean;
   onChange: (next: FeedbackValue) => void;
 }) {
-  const base = "inline-flex h-9 min-w-12 items-center justify-center gap-1 rounded-lg border px-3 text-sm transition disabled:opacity-50";
+  // 사용자 테스트에서 👍/👎를 누른 사람이 0명이라, 글자 라벨과 한 줄 설명을 붙여 크게 보이게 한다
+  const base =
+    "inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border-2 px-4 text-sm font-medium transition disabled:opacity-50 sm:flex-none";
   return (
-    <div className="flex gap-2" role="group" aria-label="추천 평가">
-      <button
-        type="button"
-        disabled={busy}
-        aria-pressed={value === 1}
-        onClick={() => onChange(value === 1 ? null : 1)}
-        className={`${base} ${value === 1 ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "border-zinc-300 hover:border-zinc-500 dark:border-zinc-700"}`}
-      >
-        👍<span className="sr-only">맞는 추천</span>
-      </button>
-      <button
-        type="button"
-        disabled={busy}
-        aria-pressed={value === -1}
-        onClick={() => onChange(value === -1 ? null : -1)}
-        className={`${base} ${value === -1 ? "border-red-500 bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300" : "border-zinc-300 hover:border-zinc-500 dark:border-zinc-700"}`}
-      >
-        👎<span className="sr-only">맞지 않는 추천</span>
-      </button>
+    <div className="flex flex-col gap-1.5">
+      <div className="flex gap-2" role="group" aria-label="이 추천이 회사에 맞나요?">
+        <button
+          type="button"
+          disabled={busy}
+          aria-pressed={value === 1}
+          onClick={() => onChange(value === 1 ? null : 1)}
+          className={`${base} ${value === 1 ? "border-emerald-500 bg-emerald-500 text-white" : "border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-transparent dark:text-emerald-300 dark:hover:bg-emerald-950/50"}`}
+        >
+          <span aria-hidden>👍</span> 맞아요
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          aria-pressed={value === -1}
+          onClick={() => onChange(value === -1 ? null : -1)}
+          className={`${base} ${value === -1 ? "border-red-500 bg-red-500 text-white" : "border-red-300 bg-white text-red-700 hover:bg-red-50 dark:border-red-800 dark:bg-transparent dark:text-red-300 dark:hover:bg-red-950/50"}`}
+        >
+          <span aria-hidden>👎</span> 아니에요
+        </button>
+      </div>
+      <p className="text-xs text-zinc-500">
+        {value === null ? "누르면 다음 추천에 반영돼요." : "다음 추천에 반영할게요. 같은 버튼을 다시 누르면 취소돼요."}
+      </p>
     </div>
   );
 }
@@ -244,11 +251,12 @@ export default function RecommendationsPanel() {
                   </span>
                   <AiBadge />
                   <span className="text-xs text-zinc-500">{item.model}</span>
-                  <div className="ml-auto">
-                    <FeedbackButtons value={item.feedback} busy={busyBid === item.bid.id} onChange={(next) => changeFeedback(item, next)} />
-                  </div>
                 </div>
                 <p className="text-sm leading-relaxed">{item.reason}</p>
+                <div className="flex flex-col gap-2 border-t border-violet-200 pt-3 sm:flex-row sm:items-start sm:justify-between dark:border-violet-900">
+                  <p className="text-sm font-medium">이 추천이 회사에 맞나요?</p>
+                  <FeedbackButtons value={item.feedback} busy={busyBid === item.bid.id} onChange={(next) => changeFeedback(item, next)} />
+                </div>
               </div>
               <ul>
                 <BidCard bid={item.bid} />

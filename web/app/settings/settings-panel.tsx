@@ -229,10 +229,23 @@ export default function SettingsPanel({ initial }: { initial: CollectSettings })
                 </div>
               </dl>
               {collect.result.inserted_count === 0 && (
-                <p className="text-xs opacity-80">이미 저장된 공고와 같아 새로 추가된 공고가 없습니다.</p>
+                // 사용자 테스트 T4 의견: 신규 0건이면 목록이 그대로라 수집이 안 된 것처럼 보였음
+                <div
+                  role="status"
+                  className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                >
+                  <span aria-hidden className="text-base leading-5">ℹ️</span>
+                  <p>
+                    <strong className="font-semibold">새로 추가된 공고가 없습니다.</strong> 받은 공고가 모두 이미 저장된 공고와
+                    같습니다. 최신 공고는 목록에 그대로 있습니다.
+                  </p>
+                </div>
               )}
-              <Link href="/bids" className="self-start underline underline-offset-4">
-                입찰공고 목록에서 보기
+              <Link
+                href="/bids"
+                className="inline-flex h-9 items-center self-start rounded-lg border border-emerald-400 px-3 font-medium hover:bg-emerald-100 dark:border-emerald-700 dark:hover:bg-emerald-900/40"
+              >
+                입찰공고 목록에서 보기 →
               </Link>
             </div>
           )}
