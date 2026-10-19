@@ -19,6 +19,9 @@ export default function SiteHeader() {
           <Link href="/chat" className={navLink}>
             AI 검색
           </Link>
+          <Link href="/recommendations" className={navLink}>
+            추천
+          </Link>
           <Link href="/settings" className={navLink}>
             수집 설정
           </Link>
